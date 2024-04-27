@@ -1,14 +1,16 @@
 import logging
 import time
 from copy import copy
-from typing import List, Callable, Union
-
-import graphviz as graphviz
-from graphviz import Digraph
-
+from typing import List, Callable, Union, Optional
 from tinydag.node import Node
 
 logger = logging.getLogger(__name__)
+
+try:
+    import graphviz as graphviz
+    from graphviz import Digraph
+except ImportError:
+    logger.warning("Cannot import graphviz")
 
 
 class GraphError(Exception):
@@ -61,20 +63,25 @@ class Graph:
 
     def render(self,
                path: str = "graph.gv",
-               view: bool = True) -> Digraph:
+               view: bool = True) -> Optional[Digraph]:
         """
         Render graph.
         :param path: Path to save fig.
         :param view: Show graph fig.
         """
-        dot = graphviz.Digraph()
-        for node in self.nodes:
-            dot.node(node.name, node.name)
-        for node in self.nodes:
-            for node_input in node.inputs:
-                dot.edge(node_input, node.name)
-        dot.render(path, view=view)
-        return dot
+
+        try:
+            dot = graphviz.Digraph()
+            for node in self.nodes:
+                dot.node(node.name, node.name)
+            for node in self.nodes:
+                for node_input in node.inputs:
+                    dot.edge(node_input, node.name)
+            dot.render(path, view=view)
+            return dot
+        except Exception as e:
+            logger.warning(f"Graph cannot be rendered, error {e}")
+            return None
 
     def check(self, input_data: dict = None) -> None:
         """
