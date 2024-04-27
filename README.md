@@ -9,10 +9,12 @@ Bare bones implementation of computation (directed, acyclic) graph for Python.
 
 # Installation
 
-Binary installers for the latest released version are available at the Python Package Index (PyPI):
-https://pypi.org/project/tiny-dag/
+Install graphviz
+```
+sudo apt-get install graphviz
+```
 
-Install by typing
+Install tiny-dag
 ```
 pip3 install tiny-dag
 ```
