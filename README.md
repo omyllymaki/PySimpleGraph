@@ -9,7 +9,7 @@ Bare bones implementation of computation (directed, acyclic) graph for Python.
 
 # Installation
 
-Install graphviz
+Install graphviz (optional, needed for rendering)
 ```
 sudo apt-get install graphviz
 ```
