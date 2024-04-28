@@ -67,7 +67,7 @@ class TestRaisesException(unittest.TestCase):
         self.assertRaises(GraphError, g.check, {"x": 1, "y": 2, "z": 3})
 
 
-class TestSimpleOperations(unittest.TestCase):
+class TestOperations(unittest.TestCase):
 
     def test_add_and_mul(self):
         nodes = [
@@ -149,10 +149,7 @@ class TestSimpleOperations(unittest.TestCase):
         self.assertEqual(results["add_out"], 1 + 2)
         self.assertEqual(results["mul_out"], (1 + 2) * 2)
 
-
-class TestComplexGraph(unittest.TestCase):
-
-    def test_complex(self):
+    def test_more_complex_graph(self):
         nodes = [
             Node(["add2", "z"], div, "div"),
             Node(["div", "add"], add, "add3"),
@@ -177,21 +174,24 @@ class TestComplexGraph(unittest.TestCase):
         self.assertEqual(results["div"], div_expected)
         self.assertEqual(results["add3"], add3_expected)
 
-
-class TestRendering(unittest.TestCase):
-
-    def test_and_and_mul(self):
+    def test_multiple_non_connected_graphs(self):
         nodes = [
-            Node(["x", "y"], add, "add"),
-            Node(["add", "z"], mul, "mul"),
+            Node(["add1", "x1"], add, "add2"),
+            Node(["x1", "x2"], add, "add1"),
+            Node(["x3", "x4"], mul, "mul"),
         ]
-        g = Graph(nodes)
-        g.render()
+        graph = Graph(nodes)
 
+        data = {"x1": 5, "x2": 3, "x3": 3, "x4": 2}
+        results = graph.calculate(data)
+        print(f"Result: {results}")
 
-class TestAddNodesToGraph(unittest.TestCase):
+        self.assertEqual(len(results), len(nodes))
+        self.assertEqual(results["add1"], 5 + 3)
+        self.assertEqual(results["add2"], (5 + 3) + 5)
+        self.assertEqual(results["mul"], 3 * 2)
 
-    def test_add_one_node(self):
+    def test_add_one_node_to_existing_graph(self):
         nodes = [
             Node(["x", "y"], add, "add"),
         ]
@@ -207,7 +207,7 @@ class TestAddNodesToGraph(unittest.TestCase):
         self.assertEqual(results["add"], 1 + 2)
         self.assertEqual(results["mul"], (1 + 2) * 2)
 
-    def test_add_multiple_nodes(self):
+    def test_add_multiple_nodes_to_existing_graph(self):
         nodes = [
             Node(["x", "y"], add, "add1"),
         ]
@@ -226,6 +226,17 @@ class TestAddNodesToGraph(unittest.TestCase):
         self.assertEqual(results["add1"], 1 + 2)
         self.assertEqual(results["mul"], (1 + 2) * 2)
         self.assertEqual(results["add2"], (1 + 2) + 2)
+
+
+class TestRendering(unittest.TestCase):
+
+    def test_and_and_mul(self):
+        nodes = [
+            Node(["x", "y"], add, "add"),
+            Node(["add", "z"], mul, "mul"),
+        ]
+        g = Graph(nodes)
+        g.render()
 
 
 if __name__ == '__main__':
