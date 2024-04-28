@@ -189,5 +189,44 @@ class TestRendering(unittest.TestCase):
         g.render()
 
 
+class TestAddNodesToGraph(unittest.TestCase):
+
+    def test_add_one_node(self):
+        nodes = [
+            Node(["x", "y"], add, "add"),
+        ]
+        g = Graph(nodes)
+
+        new_node = Node(["add", "z"], mul, "mul")
+        g += new_node
+
+        data = {"x": 1, "y": 2, "z": 2}
+        results = g.calculate(data)
+
+        self.assertEqual(len(results), 2)
+        self.assertEqual(results["add"], 1 + 2)
+        self.assertEqual(results["mul"], (1 + 2) * 2)
+
+    def test_add_multiple_nodes(self):
+        nodes = [
+            Node(["x", "y"], add, "add1"),
+        ]
+        g = Graph(nodes)
+
+        new_nodes = [
+            Node(["add1", "z"], mul, "mul"),
+            Node(["add1", "z"], add, "add2"),
+        ]
+        g += new_nodes
+
+        data = {"x": 1, "y": 2, "z": 2}
+        results = g.calculate(data)
+
+        self.assertEqual(len(results), 3)
+        self.assertEqual(results["add1"], 1 + 2)
+        self.assertEqual(results["mul"], (1 + 2) * 2)
+        self.assertEqual(results["add2"], (1 + 2) + 2)
+
+
 if __name__ == '__main__':
     unittest.main()
