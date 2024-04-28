@@ -1,7 +1,8 @@
 import logging
 import time
 from copy import copy
-from typing import List, Callable, Union, Optional
+from typing import List, Callable, Union
+
 from tinydag.node import Node
 
 logger = logging.getLogger(__name__)
@@ -63,11 +64,12 @@ class Graph:
 
     def render(self,
                path: str = "graph.gv",
-               view: bool = True) -> Optional[Digraph]:
+               view: bool = True) -> "Digraph":
         """
-        Render graph.
+        Render graph. This will only work if graphviz is available.
         :param path: Path to save fig.
         :param view: Show graph fig.
+        :return: graphviz Digraph is graphviz is available, otherwise None.
         """
 
         try:
@@ -80,7 +82,7 @@ class Graph:
             dot.render(path, view=view)
             return dot
         except Exception as e:
-            logger.warning(f"Graph cannot be rendered, error {e}")
+            logger.warning(f"Graph cannot be rendered, caught error: {e}")
             return None
 
     def check(self, input_data: dict = None) -> None:
