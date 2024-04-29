@@ -107,13 +107,14 @@ class Graph:
         return self._execute(input_data)
 
     def _execute(self, input_data: Optional[dict] = None, run: Optional[bool] = True) -> dict:
-        # Container where all the node outputs will be stored
-        results = copy(input_data) if input_data is not None else {}
+        # Container where all the node inputs will be stored
+        # This will be updated when the nodes are executed
+        inputs = copy(input_data) if input_data is not None else {}
 
         nodes_to_execute = [i for i in range(len(self.nodes))]
         t_graph_start = time.time()
 
-        # Loop until all nodes are executed
+        # Loop until all the nodes are executed
         while len(nodes_to_execute) > 0:
             logger.debug(f"Nodes to execute: {nodes_to_execute}")
 
@@ -122,18 +123,19 @@ class Graph:
             for node_index in nodes_to_execute:
                 node = self.nodes[node_index]
                 logger.debug(f"Executing node {node}")
-                node_input_data = self._get_input_data(node, results)
+                node_input_data = self._get_node_input_data(node, inputs)
                 if len(node_input_data) < len(node.inputs):
-                    continue  # All the input data cannot be found for this node yet
+                    continue  # All the input data cannot be found for this node yet, so skip this node
                 output = self._run_node(node, node_input_data) if run else "output"
-                results[node.output] = output
+                inputs[node.output_name] = output
                 nodes_executed.append(node_index)
                 logger.debug(f"Node {node} executed successfully")
 
             # Check that at least one of the nodes has been executed during this round
-            # If not, then it means that graph has invalid struct or that all the input is not provided
+            # If not, it means that the graph has invalid struct or that all the inputs are not provided
             if len(nodes_executed) == 0:
-                raise GraphError("Graph cannot be executed! One or multiple inputs are missing.")
+                raise GraphError(
+                    "Graph cannot be executed! One or multiple inputs are missing or the graph has invalid structure.")
 
             for node_index in nodes_executed:
                 nodes_to_execute.remove(node_index)
@@ -142,7 +144,9 @@ class Graph:
         t_graph_end = time.time()
         logger.debug(f"Graph execution took {1000 * (t_graph_end - t_graph_start): 0.2f} ms")
 
-        # Remove inputs
+        # As a result we return node outputs
+        # We get this from inputs, by removing the original input data from the dict
+        results = inputs
         if input_data is not None:
             for key in input_data.keys():
                 results.pop(key)
@@ -150,15 +154,18 @@ class Graph:
         return results
 
     def _run_node(self, node: Node, data: list) -> Any:
-        f = node.function
-        if self.wrappers is not None:
-            for wrapper in self.wrappers:
-                f = wrapper(f)
+        func = self._wrap_node_func(node.function)
         t_node_start = time.time()
-        output = f(*data)
+        output = func(*data)
         t_node_end = time.time()
         logger.debug(f"Node {node} execution took {1000 * (t_node_end - t_node_start): 0.3f} ms")
         return output
+
+    def _wrap_node_func(self, func):
+        if self.wrappers is not None:
+            for wrapper in self.wrappers:
+                func = wrapper(func)
+        return func
 
     def __add__(self, nodes: Union[List[Node], Node]) -> "Graph":
         if isinstance(nodes, list):
@@ -177,13 +184,13 @@ class Graph:
             raise GraphError("All the nodes need to have unique name!")
 
     @staticmethod
-    def _get_input_data(node: Node, results: dict) -> list:
+    def _get_node_input_data(node: Node, inputs: dict) -> list:
         input_data = []
         for i in node.inputs:
-            val = results.get(i, None)
-            if val is None:
+            input_item = inputs.get(i, None)
+            if input_item is None:
                 logger.debug(f"Cannot find input {i} for node {node}.")
-                break
+                break  # We cannot execute node without full input, so no need to continue
             else:
-                input_data.append(val)
+                input_data.append(input_item)
         return input_data
