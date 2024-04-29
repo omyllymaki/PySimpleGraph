@@ -22,40 +22,41 @@ class Graph:
     """
     Minimal implementation of computational (directed, acyclic) graph.
 
-    User provides graph structure (nodes) and input data for graph. Every node waits until input data for that node
-    is ready. Eventually, graph executes every node in graph and returns output of every node as result.
+    User provides the graph structure (nodes) and input data for the graph. Every node waits until input data for that
+    node is ready. Eventually, the graph executes every node in the graph and returns output of every node as the
+    result.
+
+    Example:
+
+    add = lambda a, b: a + b
+    mul = lambda a, b: a * b
+    div = lambda a, b: a / b
+
+    nodes = [
+        Node(["add1", "x"], add, "add2"),
+        Node(["add1", "add2"], mul, "mul"),
+        Node(["x", "y"], add, "add1"),
+        Node(["mul", "z"], div, "div"),
+    ]
+
+    where add, mul and div are functions. This determines the graph where
+
+    x,y -> add1
+    add1,x -> add2
+    add1,add2 -> mul
+    mul,z -> div
+
+    User needs to provide x, y and z as input data for this graph when doing calculation.
     """
 
     def __init__(self,
                  nodes: List[Node],
                  wrappers: Optional[List[Callable]] = None) -> None:
         """
-        :param nodes: List of nodes.
-        :param wrappers: Optional wrapper functions that will be used to wrap all functions in nodes.
+        :param nodes: List of nodes defining the graph.
+        :param wrappers: Optional wrapper functions that will be used to wrap all the node functions.
 
-        User needs to specify inputs, function and name for every node.
-
-        Example:
-
-        add = lambda a, b: a + b
-        mul = lambda a, b: a * b
-        div = lambda a, b: a / b
-
-        nodes = [
-            Node(["add1", "x"], add, "add2"),
-            Node(["add1", "add2"], mul, "mul"),
-            Node(["x", "y"], add, "add1"),
-            Node(["mul", "z"], div, "div"),
-        ]
-
-        where add, mul and div are functions. This determines graph where
-
-        x,y -> add1
-        add1,x -> add2
-        add1,add2 -> mul
-        mul,z -> div
-
-        Note that user needs to provide x, y and z as input data for this graph when doing calculation.
+        :raises GraphError if the node names are not unique.
         """
 
         self._check_nodes(nodes)
@@ -87,17 +88,21 @@ class Graph:
 
     def check(self, input_data: Optional[dict] = None) -> None:
         """
-        Check if graph can be executed. Raises Exception if graph is not valid.
+        Check if the graph can be executed.
 
-        :param input_data: Input data for graph, where keys are names used in graph definition.
+        :param input_data: Input data for graph, where keys are names used in the graph definition.
+
+        :raises GraphError if the graph structure is not valid.
         """
         self._execute(input_data, False)
 
     def calculate(self, input_data: Optional[dict] = None) -> dict:
         """
-        Execute every node in graph.
-        :param input_data: Input data for graph, where keys are names used in graph definition.
+        Execute every node in the graph.
+        :param input_data: Input data for the graph, where keys are names used in the graph definition.
         :return: Output of every node, with node names as keys.
+
+        :raises GraphError if the graph structure is not valid.
         """
         return self._execute(input_data)
 
