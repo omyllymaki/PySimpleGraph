@@ -1,7 +1,7 @@
 import logging
 import time
 from copy import copy
-from typing import List, Callable, Union
+from typing import List, Callable, Union, Optional, Any
 
 from tinydag.node import Node
 
@@ -28,7 +28,7 @@ class Graph:
 
     def __init__(self,
                  nodes: List[Node],
-                 wrappers: List[Callable] = None):
+                 wrappers: Optional[List[Callable]] = None) -> None:
         """
         :param nodes: List of nodes.
         :param wrappers: Optional wrapper functions that will be used to wrap all functions in nodes.
@@ -64,7 +64,7 @@ class Graph:
 
     def render(self,
                path: str = "graph.gv",
-               view: bool = True) -> "Digraph":
+               view: bool = True) -> Optional["Digraph"]:
         """
         Render graph. This will only work if graphviz is available.
         :param path: Path to save fig.
@@ -85,7 +85,7 @@ class Graph:
             logger.warning(f"Graph cannot be rendered, caught error: {e}")
             return None
 
-    def check(self, input_data: dict = None) -> None:
+    def check(self, input_data: Optional[dict] = None) -> None:
         """
         Check if graph can be executed. Raises Exception if graph is not valid.
 
@@ -93,7 +93,7 @@ class Graph:
         """
         self._execute(input_data, False)
 
-    def calculate(self, input_data: dict = None) -> dict:
+    def calculate(self, input_data: Optional[dict] = None) -> dict:
         """
         Execute every node in graph.
         :param input_data: Input data for graph, where keys are names used in graph definition.
@@ -101,7 +101,7 @@ class Graph:
         """
         return self._execute(input_data)
 
-    def _execute(self, input_data: dict = None, run: bool = True) -> dict:
+    def _execute(self, input_data: Optional[dict] = None, run: Optional[bool] = True) -> dict:
         # Container where all the node outputs will be stored
         results = copy(input_data) if input_data is not None else {}
 
@@ -144,7 +144,7 @@ class Graph:
 
         return results
 
-    def _run_node(self, node, data):
+    def _run_node(self, node: Node, data: list) -> Any:
         f = node.function
         if self.wrappers is not None:
             for wrapper in self.wrappers:
@@ -155,24 +155,24 @@ class Graph:
         logger.debug(f"Node {node} execution took {1000 * (t_node_end - t_node_start): 0.3f} ms")
         return output
 
-    def __add__(self, nodes: Union[List[Node], Node]):
+    def __add__(self, nodes: Union[List[Node], Node]) -> "Graph":
         if isinstance(nodes, list):
             nodes = self.nodes + nodes
         else:
             nodes = self.nodes + [nodes]
         return Graph(nodes, self.wrappers)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return str([n.name for n in self.nodes])
 
     @staticmethod
-    def _check_nodes(nodes):
+    def _check_nodes(nodes: List[Node]) -> None:
         node_names = [n.name for n in nodes]
         if len(set(node_names)) < len(node_names):
             raise GraphError("All the nodes need to have unique name!")
 
     @staticmethod
-    def _get_input_data(node, results):
+    def _get_input_data(node: Node, results: dict) -> list:
         input_data = []
         for i in node.inputs:
             val = results.get(i, None)
