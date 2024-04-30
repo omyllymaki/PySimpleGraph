@@ -3,6 +3,7 @@ import time
 from copy import copy
 from typing import List, Callable, Union, Optional, Any
 
+from tinydag.exceptions import InvalidGraphError, MissingInputError
 from tinydag.node import Node
 
 logger = logging.getLogger(__name__)
@@ -12,10 +13,6 @@ try:
     from graphviz import Digraph
 except ImportError:
     logger.warning("Cannot import graphviz")
-
-
-class GraphError(Exception):
-    pass
 
 
 class Graph:
@@ -55,13 +52,20 @@ class Graph:
         """
         :param nodes: List of nodes defining the graph.
         :param wrappers: Optional wrapper functions that will be used to wrap all the node functions.
-
-        :raises GraphError if the node names are not unique.
+        :raises InvalidGraphError if the node names are not unique.
         """
-
-        self._check_nodes(nodes)
+        self._check_node_names_are_unique(nodes)
         self.nodes = nodes
         self.wrappers = wrappers
+        self.required_user_inputs = self._get_required_user_inputs()
+        logger.debug(f"Required user input: {self.required_user_inputs}")
+
+    def _get_required_user_inputs(self):
+        node_output_names = [node.output_name for node in self.nodes]
+        required_inputs = []
+        for node in self.nodes:
+            required_inputs += node.inputs
+        return list(set(required_inputs) - set(node_output_names))
 
     def render(self,
                path: str = "graph.gv",
@@ -86,14 +90,12 @@ class Graph:
             logger.warning(f"Graph cannot be rendered, caught error: {e}")
             return None
 
-    def check(self, input_data: Optional[dict] = None) -> None:
+    def check(self) -> None:
         """
-        Check if the graph can be executed.
-
-        :param input_data: Input data for graph, where keys are names used in the graph definition.
-
-        :raises GraphError if the graph structure is not valid.
+        Check if the graph structure is valid.
+        :raises InvalidGraphError if the graph structure is not valid.
         """
+        input_data = {name: None for name in self.required_user_inputs}
         self._execute(input_data, False)
 
     def calculate(self, input_data: Optional[dict] = None) -> dict:
@@ -101,10 +103,17 @@ class Graph:
         Execute every node in the graph.
         :param input_data: Input data for the graph, where keys are names used in the graph definition.
         :return: Output of every node, with node names as keys.
-
-        :raises GraphError if the graph structure is not valid.
+        :raises MissingInputError if the input_data doesn't contain all the required data.
+        :raises InvalidGraphError if the graph structure is not valid.
         """
+        self._check_input_data(input_data)
         return self._execute(input_data)
+
+    def _check_input_data(self, input_data):
+        if len(self.required_user_inputs) > 0:
+            for item in self.required_user_inputs:
+                if item not in input_data:
+                    raise MissingInputError(f"Input data is missing {item}")
 
     def _execute(self, input_data: Optional[dict] = None, run: Optional[bool] = True) -> dict:
         # Container where all the node inputs will be stored
@@ -132,10 +141,9 @@ class Graph:
                 logger.debug(f"Node {node} executed successfully")
 
             # Check that at least one of the nodes has been executed during this round
-            # If not, it means that the graph has invalid struct or that all the inputs are not provided
+            # If not, it means that the graph has invalid structure
             if len(nodes_executed) == 0:
-                raise GraphError(
-                    "Graph cannot be executed! One or multiple inputs are missing or the graph has invalid structure.")
+                raise InvalidGraphError("Graph cannot be executed! The graph has invalid structure.")
 
             for node_index in nodes_executed:
                 nodes_to_execute.remove(node_index)
@@ -178,19 +186,18 @@ class Graph:
         return str([n.name for n in self.nodes])
 
     @staticmethod
-    def _check_nodes(nodes: List[Node]) -> None:
+    def _check_node_names_are_unique(nodes: List[Node]) -> None:
         node_names = [n.name for n in nodes]
         if len(set(node_names)) < len(node_names):
-            raise GraphError("All the nodes need to have unique name!")
+            raise InvalidGraphError("All the nodes need to have unique name!")
 
     @staticmethod
     def _get_node_input_data(node: Node, inputs: dict) -> list:
         input_data = []
         for i in node.inputs:
-            input_item = inputs.get(i, None)
-            if input_item is None:
+            if i in inputs:
+                input_data.append(inputs[i])
+            else:
                 logger.debug(f"Cannot find input {i} for node {node}.")
                 break  # We cannot execute node without full input, so no need to continue
-            else:
-                input_data.append(input_item)
         return input_data

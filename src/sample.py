@@ -23,7 +23,7 @@ def main():
     graph.render()
 
     data = {"x": 5, "y": 3, "z": 3}
-    graph.check(data)
+    graph.check()
     results = graph.calculate(data)
     print(f"Result: {results}")
 

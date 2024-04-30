@@ -1,7 +1,8 @@
 import unittest
 from functools import partial
 
-from tinydag.graph import Graph, GraphError
+from tinydag.exceptions import InvalidGraphError, MissingInputError
+from tinydag.graph import Graph
 from tinydag.node import Node
 
 
@@ -28,16 +29,14 @@ class TestRaisesException(unittest.TestCase):
             Node(["x", "y"], add, "add")
         ]
         g = Graph(nodes)
-        self.assertRaises(GraphError, g.calculate, {"x": 1, "z": 2})
-        self.assertRaises(GraphError, g.check, {"x": 1, "z": 2})
+        self.assertRaises(MissingInputError, g.calculate, {"x": 1, "z": 2})
 
     def test_node_missing_input2(self):
         nodes = [
             Node(["x", "y"], add, "add")
         ]
         g = Graph(nodes)
-        self.assertRaises(GraphError, g.calculate, {"x": 1})
-        self.assertRaises(GraphError, g.check, {"x": 1})
+        self.assertRaises(MissingInputError, g.calculate, {"x": 1})
 
     def test_node_missing_input3(self):
         nodes = [
@@ -45,15 +44,14 @@ class TestRaisesException(unittest.TestCase):
             Node(["x", "z"], add, "add2")
         ]
         g = Graph(nodes)
-        self.assertRaises(GraphError, g.calculate, {"x": 1, "y": 2})
-        self.assertRaises(GraphError, g.check, {"x": 1, "y": 2})
+        self.assertRaises(MissingInputError, g.calculate, {"x": 1, "y": 2})
 
     def test_not_unique_node_names(self):
         nodes = [
             Node(["x", "y"], add, "add"),
             Node(["add", "z"], mul, "add"),
         ]
-        self.assertRaises(GraphError, Graph, nodes)
+        self.assertRaises(InvalidGraphError, Graph, nodes)
 
     def test_cyclic_graph(self):
         nodes = [
@@ -63,8 +61,8 @@ class TestRaisesException(unittest.TestCase):
             Node(["add3", "add2"], mul, "add4"),
         ]
         g = Graph(nodes)
-        self.assertRaises(GraphError, g.calculate, {"x": 1, "y": 2, "z": 3})
-        self.assertRaises(GraphError, g.check, {"x": 1, "y": 2, "z": 3})
+        self.assertRaises(InvalidGraphError, g.calculate, {"x": 1, "y": 2, "z": 3})
+        self.assertRaises(InvalidGraphError, g.check)
 
 
 class TestOperations(unittest.TestCase):
