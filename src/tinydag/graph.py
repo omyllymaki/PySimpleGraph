@@ -60,12 +60,12 @@ class Graph:
         self.required_user_inputs = self._get_required_user_inputs()
         logger.debug(f"Required user input: {self.required_user_inputs}")
 
-    def _get_required_user_inputs(self):
-        node_output_names = [node.output_name for node in self.nodes]
+    def _get_required_user_inputs(self) -> List[str]:
+        node_names = [node.name for node in self.nodes]
         required_inputs = []
         for node in self.nodes:
             required_inputs += node.inputs
-        return list(set(required_inputs) - set(node_output_names))
+        return list(set(required_inputs) - set(node_names))
 
     def render(self,
                path: str = "graph.gv",
@@ -136,7 +136,7 @@ class Graph:
                 if len(node_input_data) < len(node.inputs):
                     continue  # All the input data cannot be found for this node yet, so skip this node
                 output = self._run_node(node, node_input_data) if run else "output"
-                inputs[node.output_name] = output
+                inputs[node.name] = output
                 nodes_executed.append(node_index)
                 logger.debug(f"Node {node} executed successfully")
 

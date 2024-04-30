@@ -134,19 +134,6 @@ class TestOperations(unittest.TestCase):
         self.assertEqual(results["5"], 5)
         self.assertEqual(results["add_2"], 5 + 2)
 
-    def test_non_default_name_for_outputs(self):
-        nodes = [
-            Node(["x", "y"], add, "add", "add_out"),
-            Node(["add_out", "z"], mul, "mul_out"),
-        ]
-        g = Graph(nodes)
-        data = {"x": 1, "y": 2, "z": 2}
-        results = g.calculate(data)
-
-        self.assertEqual(len(results), len(nodes))
-        self.assertEqual(results["add_out"], 1 + 2)
-        self.assertEqual(results["mul_out"], (1 + 2) * 2)
-
     def test_more_complex_graph(self):
         nodes = [
             Node(["add2", "z"], div, "div"),
