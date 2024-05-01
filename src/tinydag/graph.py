@@ -3,9 +3,9 @@ import os
 import time
 from copy import copy
 from os.path import join
-from typing import List, Callable, Union, Optional
+from typing import List, Union, Optional
 
-from tinydag.exceptions import InvalidGraphError, MissingInputError, InvalidNodeFunctionOutput
+from tinydag.exceptions import InvalidGraphError, MissingInputError
 from tinydag.node import Node
 from tinydag.utils import load_pickle, save_pickle
 
@@ -57,17 +57,14 @@ class Graph:
 
     def __init__(self,
                  nodes: List[Node],
-                 wrappers: Optional[List[Callable]] = None,
                  cache_dir="cache") -> None:
         """
         :param nodes: List of nodes defining the graph.
-        :param wrappers: Optional wrapper functions that will be used to wrap all the node functions.
         :param cache_dir: Directory to save and read cached files.
         :raises InvalidGraphError if the node names are not unique.
         """
         self._check_node_names_are_unique(nodes)
         self.nodes = nodes
-        self.wrappers = wrappers
         self.required_user_inputs = self._get_required_user_inputs()
         logger.debug(f"Required user input: {self.required_user_inputs}")
 
@@ -135,7 +132,7 @@ class Graph:
             nodes = self.nodes + nodes
         else:
             nodes = self.nodes + [nodes]
-        return Graph(nodes, self.wrappers)
+        return Graph(nodes)
 
     def __repr__(self) -> str:
         repr_str = "\n"
@@ -196,8 +193,7 @@ class Graph:
                 if run:
                     results = self._get_node_results(node, node_input_data, from_cache, to_cache)
                     if results is not None:
-                        for key, val in results.items():
-                            inputs[node.name + "/" + key] = val
+                        inputs.update(results)
                 else:
                     for output in node.outputs:
                         inputs[output] = None
@@ -233,36 +229,11 @@ class Graph:
             results = load_pickle(path)
             logger.info(f"Node {node.name} results read from cache: {path}")
         else:
-            results = self._run_node(node, node_input_data)
-        self._check_node_output(results, node)
+            results = node.run(node_input_data)
         if node.name in to_cache:
             save_pickle(path, results)
             logger.info(f"Node {node.name} results wrote to cache: {path}")
         return results
-
-    def _run_node(self, node: Node, data: list) -> dict:
-        func = self._wrap_node_func(node.function)
-        t_node_start = time.time()
-        output = func(*data)
-        t_node_end = time.time()
-        logger.debug(f"Node {node} execution took {1000 * (t_node_end - t_node_start): 0.3f} ms")
-        return output
-
-    @staticmethod
-    def _check_node_output(output: dict, node: Node) -> None:
-        if output is not None:
-            if not isinstance(output, dict):
-                raise InvalidNodeFunctionOutput(f"Node {node.name} output is not a dict!")
-        for item in node.outputs:
-            item = item.replace(f"{node.name}/", "")
-            if item not in output:
-                raise InvalidNodeFunctionOutput(f"Node {node.name} output doesn't contain required item {item}!")
-
-    def _wrap_node_func(self, func: Callable) -> Callable:
-        if self.wrappers is not None:
-            for wrapper in self.wrappers:
-                func = wrapper(func)
-        return func
 
     @staticmethod
     def _check_node_names_are_unique(nodes: List[Node]) -> None:
