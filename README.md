@@ -1,9 +1,10 @@
 # Tiny DAG
 
-Bare bones implementation of computation (directed, acyclic) graph for Python.
+A small library to orchestrate function calls using graph structure.
 
-User provides a graph structure (nodes) and input data for graph. The graph executes every node in the graph and returns 
-output of every node as the result. The library supports multiple outputs and caching of the node results.
+The library contains bare-bones implementation of computation (directed, acyclic) graph. User provides a graph structure
+(nodes) and input data for the graph. The graph executes every node in the graph and returns output of every node as the 
+result. The library supports multiple outputs per node and caching of the node results.
 
 # Requirements
 
