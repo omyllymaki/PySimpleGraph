@@ -1,5 +1,0 @@
-build==1.2.1
-graphviz==0.17
-packaging==24.0
-pyproject_hooks==1.0.0
-tomli==2.0.1
