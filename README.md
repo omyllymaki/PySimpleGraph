@@ -3,7 +3,7 @@
 Bare bones implementation of computation (directed, acyclic) graph for Python.
 
 User provides a graph structure (nodes) and input data for graph. The graph executes every node in the graph and returns 
-output of every node as the result. The library supports multiple outputs.
+output of every node as the result. The library supports multiple outputs and caching of the node results.
 
 # Requirements
 

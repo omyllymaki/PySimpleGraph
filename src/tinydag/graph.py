@@ -1,10 +1,13 @@
 import logging
+import os
 import time
 from copy import copy
+from os.path import join
 from typing import List, Callable, Union, Optional, Any
 
 from tinydag.exceptions import InvalidGraphError, MissingInputError, InvalidNodeFunctionOutput
 from tinydag.node import Node
+from tinydag.utils import load_pickle, save_pickle
 
 logger = logging.getLogger(__name__)
 
@@ -48,14 +51,18 @@ class Graph:
     mul/output, add_subtract/add_output -> div
 
     User needs to provide x, y and z as input data for this graph when doing calculation.
+
+    Cache can be used to save and load cached results.
     """
 
     def __init__(self,
                  nodes: List[Node],
-                 wrappers: Optional[List[Callable]] = None) -> None:
+                 wrappers: Optional[List[Callable]] = None,
+                 cache_dir="cache") -> None:
         """
         :param nodes: List of nodes defining the graph.
         :param wrappers: Optional wrapper functions that will be used to wrap all the node functions.
+        :param cache_dir: Directory to save and read cached files.
         :raises InvalidGraphError if the node names are not unique.
         """
         self._check_node_names_are_unique(nodes)
@@ -63,6 +70,10 @@ class Graph:
         self.wrappers = wrappers
         self.required_user_inputs = self._get_required_user_inputs()
         logger.debug(f"Required user input: {self.required_user_inputs}")
+
+        if not os.path.exists(cache_dir):
+            os.makedirs(cache_dir)
+        self.cache_dir = cache_dir
 
     def _get_required_user_inputs(self) -> List[str]:
         required_inputs, node_outputs = [], []
@@ -108,17 +119,23 @@ class Graph:
         input_data = {name: None for name in self.required_user_inputs}
         self._execute(input_data, False)
 
-    def calculate(self, input_data: Optional[dict] = None) -> dict:
+    def calculate(self,
+                  input_data: Optional[dict] = None,
+                  from_cache: Optional[List[str]] = None,
+                  to_cache: Optional[List[str]] = None) -> dict:
         """
         Execute every node in the graph.
         :param input_data: Input data for the graph, where keys are names used in the graph definition.
+        :param from_cache: List of node names to read from cache.
+        :param to_cache: List of node names to save to cache.
         :return: Output of every node, with node outputs as keys.
         :raises MissingInputError if the input_data doesn't contain all the required data.
         :raises InvalidGraphError if the graph structure is not valid.
         :raises InvalidNodeFunctionOutput if the node function output is not valid.
+        :raises FileNotFoundError if cache doesn't exist.
         """
         self._check_input_data(input_data)
-        return self._execute(input_data)
+        return self._execute(input_data, True, from_cache, to_cache)
 
     def _check_input_data(self, input_data):
         if len(self.required_user_inputs) > 0:
@@ -126,7 +143,17 @@ class Graph:
                 if item not in input_data:
                     raise MissingInputError(f"Input data is missing {item}")
 
-    def _execute(self, input_data: Optional[dict] = None, run: Optional[bool] = True) -> dict:
+    def _execute(self,
+                 input_data: Optional[dict] = None,
+                 run: Optional[bool] = True,
+                 from_cache=None,
+                 to_cache=None) -> dict:
+
+        if from_cache is None:
+            from_cache = []
+        if to_cache is None:
+            to_cache = []
+
         # Container where all the node inputs will be stored
         # This will be updated when the nodes are executed
         inputs = copy(input_data) if input_data is not None else {}
@@ -147,8 +174,18 @@ class Graph:
                 if len(node_input_data) < len(node.inputs):
                     continue  # All the input data cannot be found for this node yet, so skip this node
                 if run:
-                    results = self._run_node(node, node_input_data)
+                    if node.name in from_cache:
+                        path = join(self.cache_dir, node.name)
+                        results = load_pickle(path)
+                        logger.info(f"Node {node.name} results read from cache: {path}")
+                        print(f"Node {node.name} results read from cache: {path}")
+                    else:
+                        results = self._run_node(node, node_input_data)
                     self._check_node_output(results, node)
+                    if node.name in to_cache:
+                        path = join(self.cache_dir, node.name)
+                        save_pickle(path, results)
+                        logger.info(f"Node {node.name} results wrote to cache: {path}")
                     if results is not None:
                         for key, val in results.items():
                             inputs[node.name + "/" + key] = val
