@@ -2,8 +2,8 @@
 
 Bare bones implementation of computation (directed, acyclic) graph for Python.
 
-User provides graph structure (nodes) and input data for graph. Graph executes every node in graph and returns output 
-of every node as the result.
+User provides a graph structure (nodes) and input data for graph. The graph executes every node in the graph and returns 
+output of every node as the result. The library supports multiple outputs.
 
 # Requirements
 
@@ -22,8 +22,14 @@ Install tiny-dag
 pip3 install tiny-dag
 ```
 
-# Usage example
+# Usage
 
+The usage should be quite intuitive: write your functions as you normally would and then create graph structure that
+orchestrates the functions calls. There is one extra rule you need to know, though: functions need to return dict with
+keys matching output definition of the node. Output of the node can be referenced in the graph structure by 
+node_name/output_name.
+
+Usage example:
 ```
 from tinydag.graph import Graph
 from tinydag.node import Node
