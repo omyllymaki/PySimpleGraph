@@ -3,7 +3,7 @@ import os
 import time
 from copy import copy
 from os.path import join
-from typing import List, Callable, Union, Optional, Any
+from typing import List, Callable, Union, Optional
 
 from tinydag.exceptions import InvalidGraphError, MissingInputError, InvalidNodeFunctionOutput
 from tinydag.node import Node
@@ -75,13 +75,6 @@ class Graph:
             os.makedirs(cache_dir)
         self.cache_dir = cache_dir
 
-    def _get_required_user_inputs(self) -> List[str]:
-        required_inputs, node_outputs = [], []
-        for node in self.nodes:
-            required_inputs += node.inputs
-            node_outputs += node.outputs
-        return list(set(required_inputs) - set(node_outputs))
-
     def render(self,
                path: str = "graph.gv",
                view: bool = True) -> Optional["Digraph"]:
@@ -132,16 +125,43 @@ class Graph:
         :raises MissingInputError if the input_data doesn't contain all the required data.
         :raises InvalidGraphError if the graph structure is not valid.
         :raises InvalidNodeFunctionOutput if the node function output is not valid.
-        :raises FileNotFoundError if cache doesn't exist.
+        :raises FileNotFoundError if cache file we want to read doesn't exist.
         """
         self._check_input_data(input_data)
         return self._execute(input_data, True, from_cache, to_cache)
+
+    def __add__(self, nodes: Union[List[Node], Node]) -> "Graph":
+        if isinstance(nodes, list):
+            nodes = self.nodes + nodes
+        else:
+            nodes = self.nodes + [nodes]
+        return Graph(nodes, self.wrappers)
+
+    def __repr__(self) -> str:
+        repr_str = "\n"
+        for node in self.nodes:
+            name = node.name
+            repr_str += f"Node: {name}\n"
+            repr_str += "├─ Inputs:\n"
+            for input_node in node.inputs:
+                repr_str += f"│  ├─ {input_node}\n"
+            repr_str += "└─ Outputs:\n"
+            for output_node in node.outputs:
+                repr_str += f"   ├─ {output_node}\n"
+        return repr_str
 
     def _check_input_data(self, input_data):
         if len(self.required_user_inputs) > 0:
             for item in self.required_user_inputs:
                 if item not in input_data:
                     raise MissingInputError(f"Input data is missing {item}")
+
+    def _get_required_user_inputs(self) -> List[str]:
+        required_inputs, node_outputs = [], []
+        for node in self.nodes:
+            required_inputs += node.inputs
+            node_outputs += node.outputs
+        return list(set(required_inputs) - set(node_outputs))
 
     def _execute(self,
                  input_data: Optional[dict] = None,
@@ -174,18 +194,7 @@ class Graph:
                 if len(node_input_data) < len(node.inputs):
                     continue  # All the input data cannot be found for this node yet, so skip this node
                 if run:
-                    if node.name in from_cache:
-                        path = join(self.cache_dir, node.name)
-                        results = load_pickle(path)
-                        logger.info(f"Node {node.name} results read from cache: {path}")
-                        print(f"Node {node.name} results read from cache: {path}")
-                    else:
-                        results = self._run_node(node, node_input_data)
-                    self._check_node_output(results, node)
-                    if node.name in to_cache:
-                        path = join(self.cache_dir, node.name)
-                        save_pickle(path, results)
-                        logger.info(f"Node {node.name} results wrote to cache: {path}")
+                    results = self._get_node_results(node, node_input_data, from_cache, to_cache)
                     if results is not None:
                         for key, val in results.items():
                             inputs[node.name + "/" + key] = val
@@ -207,11 +216,28 @@ class Graph:
         t_graph_end = time.time()
         logger.debug(f"Graph execution took {1000 * (t_graph_end - t_graph_start): 0.2f} ms")
 
+        results = self._create_output(inputs)
+
+        return results
+
+    def _create_output(self, inputs: dict) -> dict:
         results = {}
         for node in self.nodes:
             for output in node.outputs:
                 results[output] = inputs[output]
+        return results
 
+    def _get_node_results(self, node: Node, node_input_data: list, from_cache: List[str], to_cache: List[str]) -> dict:
+        path = join(self.cache_dir, node.name)
+        if node.name in from_cache:
+            results = load_pickle(path)
+            logger.info(f"Node {node.name} results read from cache: {path}")
+        else:
+            results = self._run_node(node, node_input_data)
+        self._check_node_output(results, node)
+        if node.name in to_cache:
+            save_pickle(path, results)
+            logger.info(f"Node {node.name} results wrote to cache: {path}")
         return results
 
     def _run_node(self, node: Node, data: list) -> dict:
@@ -237,26 +263,6 @@ class Graph:
             for wrapper in self.wrappers:
                 func = wrapper(func)
         return func
-
-    def __add__(self, nodes: Union[List[Node], Node]) -> "Graph":
-        if isinstance(nodes, list):
-            nodes = self.nodes + nodes
-        else:
-            nodes = self.nodes + [nodes]
-        return Graph(nodes, self.wrappers)
-
-    def __repr__(self) -> str:
-        repr_str = "\n"
-        for node in self.nodes:
-            name = node.name
-            repr_str += f"Node: {name}\n"
-            repr_str += "├─ Inputs:\n"
-            for input_node in node.inputs:
-                repr_str += f"│  ├─ {input_node}\n"
-            repr_str += "└─ Outputs:\n"
-            for output_node in node.outputs:
-                repr_str += f"   ├─ {output_node}\n"
-        return repr_str
 
     @staticmethod
     def _check_node_names_are_unique(nodes: List[Node]) -> None:
