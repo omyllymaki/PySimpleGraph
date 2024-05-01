@@ -1,3 +1,5 @@
+from pprint import pprint
+
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -8,7 +10,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.svm import SVC
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
-from sklearn.metrics import roc_curve, roc_auc_score, auc
+from sklearn.metrics import roc_curve, roc_auc_score, auc, accuracy_score, precision_score, recall_score, f1_score
 
 from tinydag.graph import Graph
 from tinydag.node import Node
@@ -93,6 +95,18 @@ def plot_roc_curves(X_test, y_test, models):
     plt.show()
 
 
+def calculate_metrics(X_test, y_test, models):
+    metrics = {}
+    for name, model in models.items():
+        y_pred = model.predict(X_test)
+        accuracy = accuracy_score(y_test, y_pred)
+        precision = precision_score(y_test, y_pred)
+        recall = recall_score(y_test, y_pred)
+        f1 = f1_score(y_test, y_pred)
+        metrics[name] = {"Accuracy": accuracy, "Precision": precision, "Recall": recall, "F1-score": f1}
+    return {"metrics": metrics}
+
+
 def main():
     url = "https://archive.ics.uci.edu/ml/machine-learning-databases/statlog/german/german.data"
 
@@ -102,6 +116,8 @@ def main():
         Node(["data_loader/data"], preprocess_data, "preprocessor", ["X_train", "X_test", "y_train", "y_test"]),
         Node(["preprocessor/X_train", "preprocessor/y_train"], train_models, "model_trainer", ["models"]),
         Node(["preprocessor/X_test", "preprocessor/y_test", "model_trainer/models"], plot_roc_curves, "roc_curves"),
+        Node(["preprocessor/X_test", "preprocessor/y_test", "model_trainer/models"], calculate_metrics,
+             "metrics_calculator", ["metrics"]),
     ]
 
     graph = Graph(nodes)
@@ -110,8 +126,8 @@ def main():
 
     data = {"url": url}
     graph.check()
-    results = graph.calculate(data)
-    print(f"Result: {results}")
+    results = graph.calculate(data, to_cache=[n.name for n in nodes])
+    pprint(f"{results['metrics_calculator/metrics']}")
 
 
 if __name__ == "__main__":
