@@ -69,3 +69,6 @@ render method produces following figure:
 <p align="center">
 <img src="sample_graph.jpg" width="800px" />
 </p>
+
+For a bit more complicated and practical usage, see how the library can be used to orchestrate and visualize data
+processing pipelines: src/samples/sample_credit_risk_prediction.py.
