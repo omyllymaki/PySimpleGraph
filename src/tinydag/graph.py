@@ -25,23 +25,27 @@ class Graph:
 
     Example:
 
-    add = lambda a, b: a + b
-    mul = lambda a, b: a * b
-    div = lambda a, b: a / b
+    def add(a, b): return {"output": a + b}
+    def mul(a, b): return {"output": a * b}
+    def div(a, b): return {"output": a / b}
+    def add_subtract(a, b): return {"add_output": a + b, "subtract_output": a - b}
 
     nodes = [
-        Node(["add1", "x"], add, "add2"),
-        Node(["add1", "add2"], mul, "mul"),
-        Node(["x", "y"], add, "add1"),
-        Node(["mul", "z"], div, "div"),
+        Node(["add1/output", "x"], add, "add2", ["output"]),
+        Node(["add1/output", "add2/output"], mul, "mul", ["output"]),
+        Node(["x", "y"], add, "add1", ["output"]),
+        Node(["x", "z"], add_subtract, "add_subtract", ["add_output", "subtract_output"]),
+        Node(["mul/output", "add_subtract/add_output"], div, "div", ["output"]),
     ]
+    graph = Graph(nodes)
 
-    where add, mul and div are functions. This determines the graph where
+    Defines a graph with following connections:
 
-    x,y -> add1
-    add1,x -> add2
-    add1,add2 -> mul
-    mul,z -> div
+    x, y -> add1
+    x, z -> add_subtract
+    add1/output, x -> add2
+    add1/output, add2/output -> mul
+    mul/output, add_subtract/add_output -> div
 
     User needs to provide x, y and z as input data for this graph when doing calculation.
     """
@@ -61,11 +65,11 @@ class Graph:
         logger.debug(f"Required user input: {self.required_user_inputs}")
 
     def _get_required_user_inputs(self) -> List[str]:
-        node_names = [node.name for node in self.nodes]
-        required_inputs = []
+        required_inputs, node_outputs = [], []
         for node in self.nodes:
             required_inputs += node.inputs
-        return list(set(required_inputs) - set(node_names))
+            node_outputs += node.outputs
+        return list(set(required_inputs) - set(node_outputs))
 
     def render(self,
                path: str = "graph.gv",
@@ -80,9 +84,15 @@ class Graph:
         try:
             dot = graphviz.Digraph()
             for node in self.nodes:
-                dot.node(node.name, node.name)
-            for node in self.nodes:
+                dot.node(node.name, node.name, shape='box', style='filled', fillcolor='lightblue')
+                for output in node.outputs:
+                    dot.node(output, output, shape='oval', style='filled', fillcolor='lightgreen')
+                    dot.edge(node.name, output)
                 for node_input in node.inputs:
+                    if node_input in self.required_user_inputs:
+                        dot.node(node_input, node_input, shape='ellipse', style='filled', fillcolor='lightpink')
+                    else:
+                        dot.node(node_input, node_input, shape='oval', style='filled', fillcolor='lightgreen')
                     dot.edge(node_input, node.name)
             dot.render(path, view=view)
             return dot
@@ -135,8 +145,14 @@ class Graph:
                 node_input_data = self._get_node_input_data(node, inputs)
                 if len(node_input_data) < len(node.inputs):
                     continue  # All the input data cannot be found for this node yet, so skip this node
-                output = self._run_node(node, node_input_data) if run else "output"
-                inputs[node.name] = output
+                if run:
+                    results = self._run_node(node, node_input_data)
+                    if results is not None:
+                        for key, val in results.items():
+                            inputs[node.name + "/" + key] = val
+                else:
+                    for output in node.outputs:
+                        inputs[output] = None
                 nodes_executed.append(node_index)
                 logger.debug(f"Node {node} executed successfully")
 
