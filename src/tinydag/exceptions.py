@@ -4,3 +4,7 @@ class InvalidGraphError(Exception):
 
 class MissingInputError(Exception):
     pass
+
+
+class InvalidNodeFunctionOutput(Exception):
+    pass

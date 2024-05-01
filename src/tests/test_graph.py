@@ -1,7 +1,7 @@
 import unittest
 from functools import partial
 
-from tinydag.exceptions import InvalidGraphError, MissingInputError
+from tinydag.exceptions import InvalidGraphError, MissingInputError, InvalidNodeFunctionOutput
 from tinydag.graph import Graph
 from tinydag.node import Node
 
@@ -20,6 +20,10 @@ def div(a, b):
 
 def get_number(a):
     return {"output": a}
+
+
+def invalid_add_func(a, b):
+    return a + b  # Should return dict
 
 
 def add_subtract(a, b):
@@ -75,6 +79,20 @@ class TestRaisesException(unittest.TestCase):
         g = Graph(nodes)
         self.assertRaises(InvalidGraphError, g.calculate, {"x": 1, "y": 2, "z": 3})
         self.assertRaises(InvalidGraphError, g.check)
+
+    def test_function_doesnt_return_dict(self):
+        nodes = [
+            Node(["x", "y"], invalid_add_func, "add", ["output"])
+        ]
+        g = Graph(nodes)
+        self.assertRaises(InvalidNodeFunctionOutput, g.calculate, {"x": 1, "y": 2})
+
+    def test_function_doesnt_return_all_the_required_outputs(self):
+        nodes = [
+            Node(["x", "y"], add, "add", ["output", "output2"])
+        ]
+        g = Graph(nodes)
+        self.assertRaises(InvalidNodeFunctionOutput, g.calculate, {"x": 1, "y": 2})
 
 
 class TestOperations(unittest.TestCase):

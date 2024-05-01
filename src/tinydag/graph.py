@@ -3,7 +3,7 @@ import time
 from copy import copy
 from typing import List, Callable, Union, Optional, Any
 
-from tinydag.exceptions import InvalidGraphError, MissingInputError
+from tinydag.exceptions import InvalidGraphError, MissingInputError, InvalidNodeFunctionOutput
 from tinydag.node import Node
 
 logger = logging.getLogger(__name__)
@@ -147,6 +147,7 @@ class Graph:
                     continue  # All the input data cannot be found for this node yet, so skip this node
                 if run:
                     results = self._run_node(node, node_input_data)
+                    self._check_node_output(results, node)
                     if results is not None:
                         for key, val in results.items():
                             inputs[node.name + "/" + key] = val
@@ -182,6 +183,16 @@ class Graph:
         t_node_end = time.time()
         logger.debug(f"Node {node} execution took {1000 * (t_node_end - t_node_start): 0.3f} ms")
         return output
+
+    @staticmethod
+    def _check_node_output(output, node):
+        if output is not None:
+            if not isinstance(output, dict):
+                raise InvalidNodeFunctionOutput(f"Node {node.name} output is not a dict!")
+        for item in node.outputs:
+            item = item.replace(f"{node.name}/", "")
+            if item not in output:
+                raise InvalidNodeFunctionOutput(f"Node {node.name} output doesn't contain required item {item}!")
 
     def _wrap_node_func(self, func):
         if self.wrappers is not None:
