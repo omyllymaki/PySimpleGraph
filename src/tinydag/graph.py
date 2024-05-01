@@ -112,9 +112,10 @@ class Graph:
         """
         Execute every node in the graph.
         :param input_data: Input data for the graph, where keys are names used in the graph definition.
-        :return: Output of every node, with node names as keys.
+        :return: Output of every node, with node outputs as keys.
         :raises MissingInputError if the input_data doesn't contain all the required data.
         :raises InvalidGraphError if the graph structure is not valid.
+        :raises InvalidNodeFunctionOutput if the node function output is not valid.
         """
         self._check_input_data(input_data)
         return self._execute(input_data)
@@ -176,7 +177,7 @@ class Graph:
 
         return results
 
-    def _run_node(self, node: Node, data: list) -> Any:
+    def _run_node(self, node: Node, data: list) -> dict:
         func = self._wrap_node_func(node.function)
         t_node_start = time.time()
         output = func(*data)
@@ -185,7 +186,7 @@ class Graph:
         return output
 
     @staticmethod
-    def _check_node_output(output, node):
+    def _check_node_output(output: dict, node: Node) -> None:
         if output is not None:
             if not isinstance(output, dict):
                 raise InvalidNodeFunctionOutput(f"Node {node.name} output is not a dict!")
@@ -194,7 +195,7 @@ class Graph:
             if item not in output:
                 raise InvalidNodeFunctionOutput(f"Node {node.name} output doesn't contain required item {item}!")
 
-    def _wrap_node_func(self, func):
+    def _wrap_node_func(self, func: Callable) -> Callable:
         if self.wrappers is not None:
             for wrapper in self.wrappers:
                 func = wrapper(func)
