@@ -50,6 +50,14 @@ class TestRaisesException(unittest.TestCase):
         g = Graph(nodes)
         self.assertRaises(MissingInputError, g.calculate, {"x": 1, "y": 2})
 
+    def test_missing_input4(self):
+        nodes = [
+            Node(["x", "y"], add, "add"),
+            Node(["add/output", "x"], mul, "mul", ["output"]),
+        ]
+        g = Graph(nodes)
+        self.assertRaises(MissingInputError, g.calculate, {"x": 1, "y": 2})
+
     def test_not_unique_node_names(self):
         nodes = [
             Node(["x", "y"], add, "add", ["output"]),
@@ -163,6 +171,17 @@ class TestOperations(unittest.TestCase):
         self.assertEqual(results["div/output"], div_expected)
         self.assertEqual(results["add3/output"], add3_expected)
 
+    def test_no_output(self):
+        nodes = [
+            Node(["x", "y"], add, "add"),
+            Node(["y", "z"], mul, "mul"),
+        ]
+        g = Graph(nodes)
+        data = {"x": 1, "y": 2, "z": 2}
+        results = g.calculate(data)
+        print(results)
+        self.assertEqual(len(results), 0)
+
     def test_multiple_non_connected_graphs(self):
         nodes = [
             Node(["add1/output", "x1"], add, "add2", ["output"]),
@@ -215,6 +234,20 @@ class TestOperations(unittest.TestCase):
         self.assertEqual(results["add1/output"], 1 + 2)
         self.assertEqual(results["mul/output"], (1 + 2) * 2)
         self.assertEqual(results["add2/output"], (1 + 2) + 2)
+
+    def test_multiple_outputs(self):
+        nodes = [
+            Node(["x", "y"], add_subtract, "add_subtract", ["add_output", "subtract_output"]),
+            Node(["add_subtract/add_output", "z"], mul, "mul", ["output"]),
+        ]
+        g = Graph(nodes)
+        data = {"x": 1, "y": 2, "z": 2}
+        results = g.calculate(data)
+
+        self.assertEqual(len(results), 3)
+        self.assertEqual(results["add_subtract/add_output"], 1 + 2)
+        self.assertEqual(results["add_subtract/subtract_output"], 1 - 2)
+        self.assertEqual(results["mul/output"], (1 + 2) * 2)
 
 
 class TestRendering(unittest.TestCase):

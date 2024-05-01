@@ -168,12 +168,10 @@ class Graph:
         t_graph_end = time.time()
         logger.debug(f"Graph execution took {1000 * (t_graph_end - t_graph_start): 0.2f} ms")
 
-        # As a result we return node outputs
-        # We get this from inputs, by removing the original input data from the dict
-        results = inputs
-        if input_data is not None:
-            for key in input_data.keys():
-                results.pop(key)
+        results = {}
+        for node in self.nodes:
+            for output in node.outputs:
+                results[output] = inputs[output]
 
         return results
 
