@@ -197,7 +197,17 @@ class Graph:
         return Graph(nodes, self.wrappers)
 
     def __repr__(self) -> str:
-        return str([n.name for n in self.nodes])
+        repr_str = "\n"
+        for node in self.nodes:
+            name = node.name
+            repr_str += f"Node: {name}\n"
+            repr_str += "├─ Inputs:\n"
+            for input_node in node.inputs:
+                repr_str += f"│  ├─ {input_node}\n"
+            repr_str += "└─ Outputs:\n"
+            for output_node in node.outputs:
+                repr_str += f"   ├─ {output_node}\n"
+        return repr_str
 
     @staticmethod
     def _check_node_names_are_unique(nodes: List[Node]) -> None:
