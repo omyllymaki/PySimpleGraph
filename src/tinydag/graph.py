@@ -147,7 +147,7 @@ class Graph:
                 repr_str += f"   ├─ {output_node}\n"
         return repr_str
 
-    def _check_input_data(self, input_data):
+    def _check_input_data(self, input_data: Optional[dict]) -> None:
         if len(self.required_user_inputs) > 0:
             for item in self.required_user_inputs:
                 if item not in input_data:
@@ -189,7 +189,9 @@ class Graph:
                 logger.debug(f"Executing node {node}")
                 node_input_data = self._get_node_input_data(node, inputs)
                 if len(node_input_data) < len(node.inputs):
+                    logger.debug(f"Cannot find all the inputs for the node {node}.")
                     continue  # All the input data cannot be found for this node yet, so skip this node
+                logger.debug(f"Found all the inputs for the node {node}.")
                 if run:
                     results = self._get_node_results(node, node_input_data, from_cache, to_cache)
                     if results is not None:
@@ -223,7 +225,10 @@ class Graph:
                 results[output] = inputs[output]
         return results
 
-    def _get_node_results(self, node: Node, node_input_data: list, from_cache: List[str], to_cache: List[str]) -> dict:
+    def _get_node_results(self, node: Node,
+                          node_input_data: list,
+                          from_cache: List[str],
+                          to_cache: List[str]) -> Optional[dict]:
         path = join(self.cache_dir, node.name)
         if node.name in from_cache:
             results = load_pickle(path)
