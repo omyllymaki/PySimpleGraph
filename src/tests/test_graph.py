@@ -312,6 +312,17 @@ class TestOperations(unittest.TestCase):
         self.assertEqual(results2, results_ref)
         self.assertEqual(results3, results_ref)
 
+        # Change input data
+        data = {"x": 2, "y": 3, "z": 3}
+
+        # When reading from cache, we should get the same results
+        results4 = g.calculate(data, from_cache=all_nodes)
+        self.assertEqual(results4, results_ref)
+
+        # Without cache, we should get different results
+        results5 = g.calculate(data)
+        self.assertNotEquals(results5, results_ref)
+
 
 class TestRendering(unittest.TestCase):
 
