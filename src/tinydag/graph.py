@@ -2,7 +2,6 @@ import logging
 import multiprocessing
 import os
 import time
-from copy import copy
 from os.path import join
 from typing import List, Union, Optional
 
@@ -172,14 +171,15 @@ class Graph:
         if to_cache is None:
             to_cache = []
 
-        # Create containing all the inputs
+        # Create a container for all the inputs
         # This will be updated dynamically with the node outputs when those are finished
         # This is shared between the node processes
         manager = multiprocessing.Manager()
         inputs = manager.dict(input_data) if input_data is not None else manager.dict()
 
-        # Que for node processes
+        # Queues for node processing
         queue = multiprocessing.Queue()
+        exception_queue = multiprocessing.Queue()
 
         nodes_to_execute = [i for i in range(len(self.nodes))]
         t_graph_start = time.time()
@@ -187,27 +187,32 @@ class Graph:
         def node_task(node_index):
             node = self.nodes[node_index]
             logger.debug(f"Launched task for node {node}, process id {multiprocessing.current_process().pid}")
-            while True:
-                logger.debug(f"Trying to execute node {node}")
-                node_input_data = self._get_node_input_data(node, inputs)
-                if len(node_input_data) < len(node.inputs):
-                    logger.debug(f"Cannot find all the inputs for the node {node}.")
-                    time.sleep(0.1)
-                    continue  # All the input data cannot be found for this node yet, so skip this node
-                else:
-                    break
+            try:
+                while True:
+                    logger.debug(f"Trying to execute node {node}")
+                    node_input_data = self._get_node_input_data(node, inputs)
+                    if len(node_input_data) < len(node.inputs):
+                        logger.debug(f"Cannot find all the inputs for the node {node}.")
+                        time.sleep(0.0001)
+                        continue  # All the input data cannot be found for this node yet, so skip this node
+                    else:
+                        break
 
-            logger.debug(f"Found all the inputs for the node {node}.")
-            if run:
-                results = self._get_node_results(node, node_input_data, from_cache, to_cache)
-                if results is not None:
-                    inputs.update(results)
-            else:
-                for output in node.outputs:
-                    inputs[output] = None
-            logger.debug(f"Node {node} executed successfully")
-            logger.debug(f"Add node {node} output to inputs, inputs now contains {inputs.keys()}")
-            queue.put(node_index)
+                logger.debug(f"Found all the inputs for the node {node}.")
+                if run:
+                    results = self._get_node_results(node, node_input_data, from_cache, to_cache)
+                    if results is not None:
+                        inputs.update(results)
+                else:
+                    for output in node.outputs:
+                        inputs[output] = None
+                logger.debug(f"Node {node} executed successfully")
+                logger.debug(f"Add node {node} output to inputs, inputs now contains {inputs.keys()}")
+                queue.put(node_index)
+            except Exception as e:
+                logger.debug(f"Node {node} raised exception {e}")
+                exception_queue.put(e)
+                queue.put(None)
 
         processes = []
         for node_index in nodes_to_execute:
@@ -218,6 +223,11 @@ class Graph:
         # Wait for all nodes to finish processing
         while True:
             completed_node_index = queue.get()
+            if not exception_queue.empty():
+                exception = exception_queue.get()
+                logger.debug(f"Received exception {exception}")
+                raise exception
+
             logger.debug(f"Completed node index {completed_node_index}")
             if completed_node_index is not None:
                 nodes_to_execute.remove(completed_node_index)

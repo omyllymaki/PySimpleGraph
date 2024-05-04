@@ -86,34 +86,34 @@ class TestRaisesException(unittest.TestCase):
     #     self.assertRaises(InvalidGraphError, g.calculate, {"x": 1, "y": 2, "z": 3})
     #     self.assertRaises(InvalidGraphError, g.check)
 
-    # def test_function_doesnt_return_dict(self):
-    #     nodes = [
-    #         Node(["x", "y"], invalid_add_func, "add", ["output"])
-    #     ]
-    #     g = Graph(nodes)
-    #     self.assertRaises(InvalidNodeFunctionOutput, g.calculate, {"x": 1, "y": 2})
-    #
-    # def test_function_doesnt_return_all_the_required_outputs(self):
-    #     nodes = [
-    #         Node(["x", "y"], add, "add", ["output", "output2"])
-    #     ]
-    #     g = Graph(nodes)
-    #     self.assertRaises(InvalidNodeFunctionOutput, g.calculate, {"x": 1, "y": 2})
+    def test_function_doesnt_return_dict(self):
+        nodes = [
+            Node(["x", "y"], invalid_add_func, "add", ["output"])
+        ]
+        g = Graph(nodes)
+        self.assertRaises(InvalidNodeFunctionOutput, g.calculate, {"x": 1, "y": 2})
 
-    # def test_reading_from_non_existing_cache(self):
-    #     nodes = [
-    #         Node(["x", "y"], add, "add", ["output"]),
-    #         Node(["add/output", "z"], mul, "mul", ["output"]),
-    #     ]
-    #
-    #     cache_dir = "test_cache_dir"
-    #     if exists(cache_dir):
-    #         shutil.rmtree(cache_dir)
-    #     g = Graph(nodes, cache_dir=cache_dir)
-    #     data = {"x": 1, "y": 2, "z": 2}
-    #
-    #     all_nodes = [n.name for n in nodes]
-    #     self.assertRaises(FileNotFoundError, g.calculate, data, from_cache=all_nodes)
+    def test_function_doesnt_return_all_the_required_outputs(self):
+        nodes = [
+            Node(["x", "y"], add, "add", ["output", "output2"])
+        ]
+        g = Graph(nodes)
+        self.assertRaises(InvalidNodeFunctionOutput, g.calculate, {"x": 1, "y": 2})
+
+    def test_reading_from_non_existing_cache(self):
+        nodes = [
+            Node(["x", "y"], add, "add", ["output"]),
+            Node(["add/output", "z"], mul, "mul", ["output"]),
+        ]
+
+        cache_dir = "test_cache_dir"
+        if exists(cache_dir):
+            shutil.rmtree(cache_dir)
+        g = Graph(nodes, cache_dir=cache_dir)
+        data = {"x": 1, "y": 2, "z": 2}
+
+        all_nodes = [n.name for n in nodes]
+        self.assertRaises(FileNotFoundError, g.calculate, data, from_cache=all_nodes)
 
 
 class TestOperations(unittest.TestCase):
@@ -288,43 +288,43 @@ class TestOperations(unittest.TestCase):
         self.assertEqual(results["add_subtract/subtract_output"], 1 - 2)
         self.assertEqual(results["mul/output"], (1 + 2) * 2)
 
-    # def test_cache(self):
-    #     nodes = [
-    #         Node(["x", "y"], add, "add", ["output"]),
-    #         Node(["add/output", "z"], mul, "mul", ["output"]),
-    #     ]
-    #
-    #     cache_dir = "test_cache_dir"
-    #     if exists(cache_dir):
-    #         shutil.rmtree(cache_dir)
-    #     g = Graph(nodes, cache_dir=cache_dir)
-    #     data = {"x": 1, "y": 2, "z": 2}
-    #     all_nodes = [n.name for n in nodes]
-    #
-    #     # First let's verify that we cannot read data from cache
-    #     self.assertRaises(FileNotFoundError, g.calculate, data, from_cache=all_nodes)
-    #
-    #     # Then, write to cache output of all nodes
-    #     results_ref = g.calculate(data, to_cache=all_nodes)
-    #
-    #     # Check that we get the same results when reading different data from cache
-    #     results1 = g.calculate(data, from_cache=all_nodes)
-    #     results2 = g.calculate(data, from_cache=["add"])
-    #     results3 = g.calculate(data, from_cache=["mul"])
-    #     self.assertEqual(results1, results_ref)
-    #     self.assertEqual(results2, results_ref)
-    #     self.assertEqual(results3, results_ref)
-    #
-    #     # Change input data
-    #     data = {"x": 2, "y": 3, "z": 3}
-    #
-    #     # When reading from cache, we should get the same results
-    #     results4 = g.calculate(data, from_cache=all_nodes)
-    #     self.assertEqual(results4, results_ref)
-    #
-    #     # Without cache, we should get different results
-    #     results5 = g.calculate(data)
-    #     self.assertNotEquals(results5, results_ref)
+    def test_cache(self):
+        nodes = [
+            Node(["x", "y"], add, "add", ["output"]),
+            Node(["add/output", "z"], mul, "mul", ["output"]),
+        ]
+
+        cache_dir = "test_cache_dir"
+        if exists(cache_dir):
+            shutil.rmtree(cache_dir)
+        g = Graph(nodes, cache_dir=cache_dir)
+        data = {"x": 1, "y": 2, "z": 2}
+        all_nodes = [n.name for n in nodes]
+
+        # First let's verify that we cannot read data from cache
+        self.assertRaises(FileNotFoundError, g.calculate, data, from_cache=all_nodes)
+
+        # Then, write to cache output of all nodes
+        results_ref = g.calculate(data, to_cache=all_nodes)
+
+        # Check that we get the same results when reading different data from cache
+        results1 = g.calculate(data, from_cache=all_nodes)
+        results2 = g.calculate(data, from_cache=["add"])
+        results3 = g.calculate(data, from_cache=["mul"])
+        self.assertEqual(results1, results_ref)
+        self.assertEqual(results2, results_ref)
+        self.assertEqual(results3, results_ref)
+
+        # Change input data
+        data = {"x": 2, "y": 3, "z": 3}
+
+        # When reading from cache, we should get the same results
+        results4 = g.calculate(data, from_cache=all_nodes)
+        self.assertEqual(results4, results_ref)
+
+        # Without cache, we should get different results
+        results5 = g.calculate(data)
+        self.assertNotEquals(results5, results_ref)
 
 
 class TestRendering(unittest.TestCase):
