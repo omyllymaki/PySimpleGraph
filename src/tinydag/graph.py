@@ -2,7 +2,7 @@ import logging
 import multiprocessing
 import os
 import time
-from copy import copy
+from copy import copy, deepcopy
 from os.path import join
 from typing import List, Union, Optional
 
@@ -72,6 +72,7 @@ class Graph:
         if not os.path.exists(cache_dir):
             os.makedirs(cache_dir)
         self.cache_dir = cache_dir
+        self.copy_node_input_data = True
 
     def render(self,
                path: str = "graph.gv",
@@ -114,13 +115,15 @@ class Graph:
                   input_data: Optional[dict] = None,
                   from_cache: Optional[List[str]] = None,
                   to_cache: Optional[List[str]] = None,
-                  parallel: bool = True) -> dict:
+                  parallel: bool = False,
+                  copy_node_input_data: bool = True) -> dict:
         """
         Execute every node in the graph.
         :param input_data: Input data for the graph, where keys are names used in the graph definition.
         :param from_cache: List of node names to read from cache.
         :param to_cache: List of node names to save to cache.
         :param parallel: Run nodes in parallel, one process for each.
+        :param copy_node_input_data: Make deepcopy of the data that is passed to node.
         :return: Output of every node, with node outputs as keys.
         :raises MissingInputError if the input_data doesn't contain all the required data.
         :raises InvalidGraphError if the graph structure is not valid.
@@ -129,6 +132,7 @@ class Graph:
         """
         self._check_input_data(input_data)
         self.check()
+        self.copy_node_input_data = copy_node_input_data
         return self._execute(input_data, True, from_cache, to_cache, parallel)
 
     def __add__(self, nodes: Union[List[Node], Node]) -> "Graph":
@@ -192,7 +196,7 @@ class Graph:
     def _run_nodes_sequentially(self, input_data, nodes_to_execute, from_cache, to_cache, run):
         # Container where all the node inputs will be stored
         # This will be updated when the nodes are executed
-        inputs = copy(input_data) if input_data is not None else {}
+        inputs = deepcopy(input_data) if input_data is not None else {}
 
         # Loop until all the nodes are executed
         while len(nodes_to_execute) > 0:
@@ -233,6 +237,7 @@ class Graph:
         inputs = manager.dict(input_data) if input_data is not None else manager.dict()
         queue = multiprocessing.Queue()
         exception_queue = multiprocessing.Queue()
+        lock = multiprocessing.Lock()
 
         def node_task(node_index):
             node = self.nodes[node_index]
@@ -251,7 +256,8 @@ class Graph:
                 logger.debug(f"Found all the inputs for the node {node}.")
                 results = self._get_node_results(node, node_input_data, from_cache, to_cache)
                 if results is not None:
-                    inputs.update(results)
+                    with lock:
+                        inputs.update(results)
 
                 logger.debug(f"Node {node} executed successfully")
                 logger.debug(f"Add node {node} output to inputs, inputs now contains {inputs.keys()}")
@@ -297,7 +303,10 @@ class Graph:
             results = load_pickle(path)
             logger.info(f"Node {node.name} results read from cache: {path}")
         else:
-            results = node.run(node_input_data)
+            if self.copy_node_input_data:
+                results = node.run(deepcopy(node_input_data))
+            else:
+                results = node.run(node_input_data)
         if node.name in to_cache:
             save_pickle(path, results)
             logger.info(f"Node {node.name} results wrote to cache: {path}")
