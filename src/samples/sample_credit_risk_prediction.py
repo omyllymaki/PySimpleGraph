@@ -1,3 +1,4 @@
+import logging
 from pprint import pprint
 
 import pandas as pd
@@ -14,6 +15,11 @@ from sklearn.metrics import roc_curve, roc_auc_score, auc, accuracy_score, preci
 
 from tinydag.graph import Graph
 from tinydag.node import Node
+
+logging.basicConfig(level=logging.INFO)
+matplotlib_logger = logging.getLogger('matplotlib')
+matplotlib_logger.setLevel(logging.WARNING)
+logging.getLogger('PIL.PngImagePlugin').setLevel(logging.WARNING)
 
 
 def load_data(url):
@@ -124,8 +130,7 @@ def main():
     graph.render()
 
     data = {"url": url}
-    graph.validate_graph()
-    results = graph.calculate(data, parallel=True)
+    results = graph.calculate(data, parallel=True, copy_node_input_data=True)
     pprint(f"{results['metrics_calculator/metrics']}")
 
 

@@ -111,6 +111,7 @@ class Graph:
         Check if the graph structure is valid.
         :raises InvalidGraphError if the graph structure is not valid.
         """
+        logger.info(f"Graph validation started")
         self._run_nodes = False
         input_data = {name: None for name in self._required_user_inputs}
         self._run_nodes_sequentially(input_data)
@@ -143,6 +144,7 @@ class Graph:
         self._copy_node_input_data = copy_node_input_data
         self._run_nodes = True
 
+        logger.info(f"Graph calculation started")
         return self._execute(input_data)
 
     def __add__(self, nodes: Union[List[Node], Node]) -> "Graph":
@@ -187,7 +189,7 @@ class Graph:
             outputs = self._run_nodes_parallel(input_data)
         else:
             outputs = self._run_nodes_sequentially(input_data)
-        logger.debug("All nodes executed successfully")
+        logger.info("All nodes executed successfully")
         t_graph_end = time.time()
         logger.debug(f"Graph execution took {1000 * (t_graph_end - t_graph_start): 0.2f} ms")
         return self._create_output(outputs)
@@ -207,10 +209,10 @@ class Graph:
             nodes_executed = []
             for node_index in nodes_to_execute:
                 node = self._nodes[node_index]
-                logger.debug(f"Executing node {node}")
+                logger.info(f"Executing node {node}")
                 node_input_data = self._collect_node_input_data(node, inputs)
                 if len(node_input_data) < len(node.inputs):
-                    logger.debug(f"Cannot find all the inputs for the node {node}.")
+                    logger.info(f"Cannot find all the inputs for the node {node}.")
                     continue  # All the input data cannot be found for this node yet, so skip this node
                 logger.debug(f"Found all the inputs for the node {node}.")
                 if self._run_nodes:
@@ -221,7 +223,7 @@ class Graph:
                     for output in node.outputs:
                         inputs[output] = None
                 nodes_executed.append(node_index)
-                logger.debug(f"Node {node} executed successfully")
+                logger.info(f"Node {node} executed successfully")
 
             # Check that at least one of the nodes has been executed during this round
             # If not, it means that the graph has invalid structure
@@ -243,18 +245,14 @@ class Graph:
 
         def node_task(node_index):
             node = self._nodes[node_index]
-            logger.debug(f"Launched task for node {node}, process id {multiprocessing.current_process().pid}")
+            logger.info(f"Launched task for node {node}, process id {multiprocessing.current_process().pid}")
             try:
                 # Wait until input data is available
-                counter = 0
+                logger.debug(f"Node {node} waiting for the data")
                 while True:
-                    logger.debug(f"Trying to execute node {node}")
                     node_input_data = self._collect_node_input_data(node, inputs)
                     if len(node_input_data) < len(node.inputs):
-                        if counter % 100 == 0:
-                            logger.debug(f"Cannot find all the inputs for the node {node}.")
                         time.sleep(0.0001)
-                        counter += 1
                         continue
                     else:
                         break
@@ -265,11 +263,11 @@ class Graph:
                     with lock:
                         inputs.update(results)
 
-                logger.debug(f"Node {node} executed successfully")
+                logger.info(f"Node {node} executed successfully")
                 logger.debug(f"Add node {node} output to inputs, inputs now contains {inputs.keys()}")
                 queue.put(node_index)
             except Exception as e:
-                logger.debug(f"Node {node} raised exception {e}")
+                logger.warning(f"Node {node} raised exception {e}")
                 exception_queue.put(e)
                 queue.put(None)
 
@@ -284,7 +282,7 @@ class Graph:
             completed_node_index = queue.get()
             if not exception_queue.empty():
                 exception = exception_queue.get()
-                logger.debug(f"Received exception {exception}")
+                logger.warning(f"Received exception {exception}")
                 raise exception
 
             logger.debug(f"Completed node index {completed_node_index}")

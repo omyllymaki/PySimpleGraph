@@ -3,7 +3,7 @@ import logging
 from tinydag.graph import Graph
 from tinydag.node import Node
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 
 
 def add(a, b):
@@ -36,8 +36,7 @@ def main():
     graph.render()
 
     data = {"x": 5, "y": 3, "z": 3}
-    graph.validate_graph()
-    results = graph.calculate(data)
+    results = graph.calculate(data, parallel=False)
     print(f"Result: {results}")
 
 
