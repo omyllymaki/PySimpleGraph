@@ -2,7 +2,6 @@ import logging
 import shutil
 import unittest
 from functools import partial
-from os import rmdir
 from os.path import exists
 
 from tinydag.exceptions import InvalidGraphError, MissingInputError, InvalidNodeFunctionOutput
@@ -75,16 +74,16 @@ class TestRaisesException(unittest.TestCase):
         ]
         self.assertRaises(InvalidGraphError, Graph, nodes)
 
-    # def test_cyclic_graph(self):
-    #     nodes = [
-    #         Node(["x", "add4/output"], add, "add1", ["output"]),
-    #         Node(["add1/output", "z"], mul, "add2", ["output"]),
-    #         Node(["add1/output", "add2/output"], mul, "add3", ["output"]),
-    #         Node(["add3/output", "add2/output"], mul, "add4", ["output"]),
-    #     ]
-    #     g = Graph(nodes)
-    #     self.assertRaises(InvalidGraphError, g.calculate, {"x": 1, "y": 2, "z": 3})
-    #     self.assertRaises(InvalidGraphError, g.check)
+    def test_cyclic_graph(self):
+        nodes = [
+            Node(["x", "add4/output"], add, "add1", ["output"]),
+            Node(["add1/output", "z"], mul, "add2", ["output"]),
+            Node(["add1/output", "add2/output"], mul, "add3", ["output"]),
+            Node(["add3/output", "add2/output"], mul, "add4", ["output"]),
+        ]
+        g = Graph(nodes)
+        self.assertRaises(InvalidGraphError, g.calculate, {"x": 1, "y": 2, "z": 3})
+        self.assertRaises(InvalidGraphError, g.check)
 
     def test_function_doesnt_return_dict(self):
         nodes = [

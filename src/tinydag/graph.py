@@ -2,6 +2,7 @@ import logging
 import multiprocessing
 import os
 import time
+from copy import copy
 from os.path import join
 from typing import List, Union, Optional
 
@@ -107,17 +108,19 @@ class Graph:
         :raises InvalidGraphError if the graph structure is not valid.
         """
         input_data = {name: None for name in self.required_user_inputs}
-        self._execute(input_data, False)
+        self._execute(input_data, run=False, parallel=False)
 
     def calculate(self,
                   input_data: Optional[dict] = None,
                   from_cache: Optional[List[str]] = None,
-                  to_cache: Optional[List[str]] = None) -> dict:
+                  to_cache: Optional[List[str]] = None,
+                  parallel: bool = True) -> dict:
         """
         Execute every node in the graph.
         :param input_data: Input data for the graph, where keys are names used in the graph definition.
         :param from_cache: List of node names to read from cache.
         :param to_cache: List of node names to save to cache.
+        :param parallel: Run nodes in parallel, one process for each.
         :return: Output of every node, with node outputs as keys.
         :raises MissingInputError if the input_data doesn't contain all the required data.
         :raises InvalidGraphError if the graph structure is not valid.
@@ -125,7 +128,8 @@ class Graph:
         :raises FileNotFoundError if cache file we want to read doesn't exist.
         """
         self._check_input_data(input_data)
-        return self._execute(input_data, True, from_cache, to_cache)
+        self.check()
+        return self._execute(input_data, True, from_cache, to_cache, parallel)
 
     def __add__(self, nodes: Union[List[Node], Node]) -> "Graph":
         if isinstance(nodes, list):
@@ -163,26 +167,72 @@ class Graph:
     def _execute(self,
                  input_data: Optional[dict] = None,
                  run: Optional[bool] = True,
-                 from_cache=None,
-                 to_cache=None) -> dict:
+                 from_cache: Optional[bool] = None,
+                 to_cache: Optional[bool] = None,
+                 parallel: bool = True) -> dict:
 
         if from_cache is None:
             from_cache = []
         if to_cache is None:
             to_cache = []
 
-        # Create a container for all the inputs
-        # This will be updated dynamically with the node outputs when those are finished
-        # This is shared between the node processes
+        nodes_to_execute = [i for i in range(len(self.nodes))]
+
+        t_graph_start = time.time()
+        if parallel:
+            outputs = self._run_nodes_parallel(input_data, nodes_to_execute, from_cache, to_cache)
+        else:
+            outputs = self._run_nodes_sequentially(input_data, nodes_to_execute, from_cache, to_cache, run)
+        logger.debug("All nodes executed successfully")
+        t_graph_end = time.time()
+        logger.debug(f"Graph execution took {1000 * (t_graph_end - t_graph_start): 0.2f} ms")
+
+        return self._create_output(outputs)
+
+    def _run_nodes_sequentially(self, input_data, nodes_to_execute, from_cache, to_cache, run):
+        # Container where all the node inputs will be stored
+        # This will be updated when the nodes are executed
+        inputs = copy(input_data) if input_data is not None else {}
+
+        # Loop until all the nodes are executed
+        while len(nodes_to_execute) > 0:
+            logger.debug(f"Nodes to execute: {nodes_to_execute}")
+
+            # Execute every node that has all the inputs available
+            nodes_executed = []
+            for node_index in nodes_to_execute:
+                node = self.nodes[node_index]
+                logger.debug(f"Executing node {node}")
+                node_input_data = self._get_node_input_data(node, inputs)
+                if len(node_input_data) < len(node.inputs):
+                    logger.debug(f"Cannot find all the inputs for the node {node}.")
+                    continue  # All the input data cannot be found for this node yet, so skip this node
+                logger.debug(f"Found all the inputs for the node {node}.")
+                if run:
+                    results = self._get_node_results(node, node_input_data, from_cache, to_cache)
+                    if results is not None:
+                        inputs.update(results)
+                else:
+                    for output in node.outputs:
+                        inputs[output] = None
+                nodes_executed.append(node_index)
+                logger.debug(f"Node {node} executed successfully")
+
+            # Check that at least one of the nodes has been executed during this round
+            # If not, it means that the graph has invalid structure
+            if len(nodes_executed) == 0:
+                raise InvalidGraphError("Graph cannot be executed! The graph has invalid structure.")
+
+            for node_index in nodes_executed:
+                nodes_to_execute.remove(node_index)
+
+        return inputs
+
+    def _run_nodes_parallel(self, input_data, nodes_to_execute, from_cache, to_cache):
         manager = multiprocessing.Manager()
         inputs = manager.dict(input_data) if input_data is not None else manager.dict()
-
-        # Queues for node processing
         queue = multiprocessing.Queue()
         exception_queue = multiprocessing.Queue()
-
-        nodes_to_execute = [i for i in range(len(self.nodes))]
-        t_graph_start = time.time()
 
         def node_task(node_index):
             node = self.nodes[node_index]
@@ -199,13 +249,10 @@ class Graph:
                         break
 
                 logger.debug(f"Found all the inputs for the node {node}.")
-                if run:
-                    results = self._get_node_results(node, node_input_data, from_cache, to_cache)
-                    if results is not None:
-                        inputs.update(results)
-                else:
-                    for output in node.outputs:
-                        inputs[output] = None
+                results = self._get_node_results(node, node_input_data, from_cache, to_cache)
+                if results is not None:
+                    inputs.update(results)
+
                 logger.debug(f"Node {node} executed successfully")
                 logger.debug(f"Add node {node} output to inputs, inputs now contains {inputs.keys()}")
                 queue.put(node_index)
@@ -219,7 +266,6 @@ class Graph:
             process = multiprocessing.Process(target=node_task, args=(node_index,))
             process.start()
             processes.append(process)
-
         # Wait for all nodes to finish processing
         while True:
             completed_node_index = queue.get()
@@ -233,14 +279,7 @@ class Graph:
                 nodes_to_execute.remove(completed_node_index)
                 if len(nodes_to_execute) == 0:
                     break
-
-        logger.debug("All nodes executed successfully")
-        t_graph_end = time.time()
-        logger.debug(f"Graph execution took {1000 * (t_graph_end - t_graph_start): 0.2f} ms")
-
-        results = self._create_output(inputs)
-
-        return results
+        return inputs
 
     def _create_output(self, inputs: dict) -> dict:
         results = {}
