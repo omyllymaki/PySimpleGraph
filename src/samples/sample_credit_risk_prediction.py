@@ -124,7 +124,7 @@ def main():
     graph.render()
 
     data = {"url": url}
-    graph.check()
+    graph.validate_graph()
     results = graph.calculate(data, parallel=True)
     pprint(f"{results['metrics_calculator/metrics']}")
 

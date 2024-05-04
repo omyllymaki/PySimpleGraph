@@ -64,15 +64,18 @@ class Graph:
         :param cache_dir: Directory to save and read cached files.
         :raises InvalidGraphError if the node names are not unique.
         """
-        self._check_node_names_are_unique(nodes)
-        self.nodes = nodes
-        self.required_user_inputs = self._get_required_user_inputs()
-        logger.debug(f"Required user input: {self.required_user_inputs}")
-
         if not os.path.exists(cache_dir):
             os.makedirs(cache_dir)
-        self.cache_dir = cache_dir
-        self.copy_node_input_data = True
+        self._cache_dir = cache_dir
+
+        self._check_node_names_are_unique(nodes)
+        self._nodes = nodes
+        self._required_user_inputs = self._get_required_user_inputs()
+        self._from_cache = None
+        self._to_cache = None
+        self._parallel = False
+        self._copy_node_input_data = True
+        self._run_nodes = True
 
     def render(self,
                path: str = "graph.gv",
@@ -86,13 +89,13 @@ class Graph:
 
         try:
             dot = graphviz.Digraph()
-            for node in self.nodes:
+            for node in self._nodes:
                 dot.node(node.name, node.name, shape='box', style='filled', fillcolor='lightblue')
                 for output in node.outputs:
                     dot.node(output, output, shape='oval', style='filled', fillcolor='lightgreen')
                     dot.edge(node.name, output)
                 for node_input in node.inputs:
-                    if node_input in self.required_user_inputs:
+                    if node_input in self._required_user_inputs:
                         dot.node(node_input, node_input, shape='ellipse', style='filled', fillcolor='lightpink')
                     else:
                         dot.node(node_input, node_input, shape='oval', style='filled', fillcolor='lightgreen')
@@ -103,13 +106,14 @@ class Graph:
             logger.warning(f"Graph cannot be rendered, caught error: {e}")
             return None
 
-    def check(self) -> None:
+    def validate_graph(self) -> None:
         """
         Check if the graph structure is valid.
         :raises InvalidGraphError if the graph structure is not valid.
         """
-        input_data = {name: None for name in self.required_user_inputs}
-        self._execute(input_data, run=False, parallel=False)
+        self._run_nodes = False
+        input_data = {name: None for name in self._required_user_inputs}
+        self._run_nodes_sequentially(input_data)
 
     def calculate(self,
                   input_data: Optional[dict] = None,
@@ -131,20 +135,26 @@ class Graph:
         :raises FileNotFoundError if cache file we want to read doesn't exist.
         """
         self._check_input_data(input_data)
-        self.check()
-        self.copy_node_input_data = copy_node_input_data
-        return self._execute(input_data, True, from_cache, to_cache, parallel)
+        self.validate_graph()
+
+        self._from_cache = from_cache if from_cache is not None else []
+        self._to_cache = to_cache if to_cache is not None else []
+        self._parallel = parallel
+        self._copy_node_input_data = copy_node_input_data
+        self._run_nodes = True
+
+        return self._execute(input_data)
 
     def __add__(self, nodes: Union[List[Node], Node]) -> "Graph":
         if isinstance(nodes, list):
-            nodes = self.nodes + nodes
+            nodes = self._nodes + nodes
         else:
-            nodes = self.nodes + [nodes]
+            nodes = self._nodes + [nodes]
         return Graph(nodes)
 
     def __repr__(self) -> str:
         repr_str = "\n"
-        for node in self.nodes:
+        for node in self._nodes:
             name = node.name
             repr_str += f"Node: {name}\n"
             repr_str += "├─ Inputs:\n"
@@ -156,44 +166,37 @@ class Graph:
         return repr_str
 
     def _check_input_data(self, input_data: Optional[dict]) -> None:
-        if len(self.required_user_inputs) > 0:
-            for item in self.required_user_inputs:
+        if len(self._required_user_inputs) > 0:
+            for item in self._required_user_inputs:
                 if item not in input_data:
                     raise MissingInputError(f"Input data is missing {item}")
 
     def _get_required_user_inputs(self) -> List[str]:
         required_inputs, node_outputs = [], []
-        for node in self.nodes:
+        for node in self._nodes:
             required_inputs += node.inputs
             node_outputs += node.outputs
-        return list(set(required_inputs) - set(node_outputs))
+        required_user_input = list(set(required_inputs) - set(node_outputs))
+        logger.debug(f"Required user input: {required_user_input}")
+        return required_user_input
 
-    def _execute(self,
-                 input_data: Optional[dict] = None,
-                 run: Optional[bool] = True,
-                 from_cache: Optional[bool] = None,
-                 to_cache: Optional[bool] = None,
-                 parallel: bool = True) -> dict:
-
-        if from_cache is None:
-            from_cache = []
-        if to_cache is None:
-            to_cache = []
-
-        nodes_to_execute = [i for i in range(len(self.nodes))]
+    def _execute(self, input_data: Optional[dict] = None) -> dict:
 
         t_graph_start = time.time()
-        if parallel:
-            outputs = self._run_nodes_parallel(input_data, nodes_to_execute, from_cache, to_cache)
+        if self._parallel:
+            outputs = self._run_nodes_parallel(input_data)
         else:
-            outputs = self._run_nodes_sequentially(input_data, nodes_to_execute, from_cache, to_cache, run)
+            outputs = self._run_nodes_sequentially(input_data)
         logger.debug("All nodes executed successfully")
         t_graph_end = time.time()
         logger.debug(f"Graph execution took {1000 * (t_graph_end - t_graph_start): 0.2f} ms")
 
         return self._create_output(outputs)
 
-    def _run_nodes_sequentially(self, input_data, nodes_to_execute, from_cache, to_cache, run):
+    def _run_nodes_sequentially(self, input_data):
+
+        nodes_to_execute = [i for i in range(len(self._nodes))]
+
         # Container where all the node inputs will be stored
         # This will be updated when the nodes are executed
         inputs = deepcopy(input_data) if input_data is not None else {}
@@ -205,15 +208,15 @@ class Graph:
             # Execute every node that has all the inputs available
             nodes_executed = []
             for node_index in nodes_to_execute:
-                node = self.nodes[node_index]
+                node = self._nodes[node_index]
                 logger.debug(f"Executing node {node}")
                 node_input_data = self._get_node_input_data(node, inputs)
                 if len(node_input_data) < len(node.inputs):
                     logger.debug(f"Cannot find all the inputs for the node {node}.")
                     continue  # All the input data cannot be found for this node yet, so skip this node
                 logger.debug(f"Found all the inputs for the node {node}.")
-                if run:
-                    results = self._get_node_results(node, node_input_data, from_cache, to_cache)
+                if self._run_nodes:
+                    results = self._get_node_results(node, node_input_data)
                     if results is not None:
                         inputs.update(results)
                 else:
@@ -232,7 +235,8 @@ class Graph:
 
         return inputs
 
-    def _run_nodes_parallel(self, input_data, nodes_to_execute, from_cache, to_cache):
+    def _run_nodes_parallel(self, input_data):
+        nodes_to_execute = [i for i in range(len(self._nodes))]
         manager = multiprocessing.Manager()
         inputs = manager.dict(input_data) if input_data is not None else manager.dict()
         queue = multiprocessing.Queue()
@@ -240,7 +244,7 @@ class Graph:
         lock = multiprocessing.Lock()
 
         def node_task(node_index):
-            node = self.nodes[node_index]
+            node = self._nodes[node_index]
             logger.debug(f"Launched task for node {node}, process id {multiprocessing.current_process().pid}")
             try:
                 while True:
@@ -254,7 +258,7 @@ class Graph:
                         break
 
                 logger.debug(f"Found all the inputs for the node {node}.")
-                results = self._get_node_results(node, node_input_data, from_cache, to_cache)
+                results = self._get_node_results(node, node_input_data)
                 if results is not None:
                     with lock:
                         inputs.update(results)
@@ -272,6 +276,7 @@ class Graph:
             process = multiprocessing.Process(target=node_task, args=(node_index,))
             process.start()
             processes.append(process)
+
         # Wait for all nodes to finish processing
         while True:
             completed_node_index = queue.get()
@@ -289,25 +294,23 @@ class Graph:
 
     def _create_output(self, inputs: dict) -> dict:
         results = {}
-        for node in self.nodes:
+        for node in self._nodes:
             for output in node.outputs:
                 results[output] = inputs[output]
         return results
 
     def _get_node_results(self, node: Node,
-                          node_input_data: list,
-                          from_cache: List[str],
-                          to_cache: List[str]) -> Optional[dict]:
-        path = join(self.cache_dir, node.name)
-        if node.name in from_cache:
+                          node_input_data: list) -> Optional[dict]:
+        path = join(self._cache_dir, node.name)
+        if node.name in self._from_cache:
             results = load_pickle(path)
             logger.info(f"Node {node.name} results read from cache: {path}")
         else:
-            if self.copy_node_input_data:
+            if self._copy_node_input_data:
                 results = node.run(deepcopy(node_input_data))
             else:
                 results = node.run(node_input_data)
-        if node.name in to_cache:
+        if node.name in self._to_cache:
             save_pickle(path, results)
             logger.info(f"Node {node.name} results wrote to cache: {path}")
         return results

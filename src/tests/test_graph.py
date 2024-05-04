@@ -100,7 +100,7 @@ class TestRaisesException(BaseTest):
         ]
         g = Graph(nodes)
         self.assertRaises(InvalidGraphError, g.calculate, {"x": 1, "y": 2, "z": 3}, parallel=self.run_parallel)
-        self.assertRaises(InvalidGraphError, g.check)
+        self.assertRaises(InvalidGraphError, g.validate_graph)
 
     def test_function_doesnt_return_dict(self):
         nodes = [
