@@ -36,7 +36,6 @@ def perform_eda(data):
         sns.histplot(data[feature], bins=20, kde=True)
         plt.title(f"{feature} Histogram")
     plt.tight_layout()
-    plt.show()
 
     plt.figure(figsize=(18, 24))
     categorical_features = [
@@ -126,7 +125,7 @@ def main():
 
     data = {"url": url}
     graph.check()
-    results = graph.calculate(data, to_cache=[n.name for n in nodes])
+    results = graph.calculate(data, parallel=True)
     pprint(f"{results['metrics_calculator/metrics']}")
 
 
