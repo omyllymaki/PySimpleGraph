@@ -33,6 +33,10 @@ def add_return_none(a, b):
     return
 
 
+def zero_division(a):
+    return {"output": a / 0}
+
+
 def invalid_add_func(a, b):
     return a + b  # Should return dict
 
@@ -130,6 +134,13 @@ class TestRaisesException(BaseTest):
 
         all_nodes = [n.name for n in nodes]
         self.assertRaises(FileNotFoundError, g.calculate, data, from_cache=all_nodes, parallel=self.run_parallel)
+
+    def test_node_exception_is_raised_by_graph_calculate(self):
+        nodes = [
+            Node(["x"], zero_division, "zero_division", ["output"])
+        ]
+        g = Graph(nodes)
+        self.assertRaises(ZeroDivisionError, g.calculate, {"x": 1}, parallel=self.run_parallel)
 
 
 class TestOperations(BaseTest):
