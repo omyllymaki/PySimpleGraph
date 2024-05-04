@@ -21,7 +21,7 @@ except ImportError:
 
 class Graph:
     """
-    Minimal implementation of computational (directed, acyclic) graph.
+    Directed and acyclic graph structure to orchestrate function calls.
 
     User provides the graph structure (nodes) and input data for the graph. Every node waits until input data for that
     node is ready. Eventually, the graph executes every node in the graph and returns output of every node as the
@@ -68,7 +68,7 @@ class Graph:
             os.makedirs(cache_dir)
         self._cache_dir = cache_dir
 
-        self._check_node_names_are_unique(nodes)
+        self._validate_node_names(nodes)
         self._nodes = nodes
         self._required_user_inputs = self._get_required_user_inputs()
         self._from_cache = None
@@ -134,7 +134,7 @@ class Graph:
         :raises InvalidNodeFunctionOutput if the node function output is not valid.
         :raises FileNotFoundError if cache file we want to read doesn't exist.
         """
-        self._check_input_data(input_data)
+        self._validate_input_data(input_data)
         self.validate_graph()
 
         self._from_cache = from_cache if from_cache is not None else []
@@ -165,7 +165,7 @@ class Graph:
                 repr_str += f"   ├─ {output_node}\n"
         return repr_str
 
-    def _check_input_data(self, input_data: Optional[dict]) -> None:
+    def _validate_input_data(self, input_data: Optional[dict]) -> None:
         if len(self._required_user_inputs) > 0:
             for item in self._required_user_inputs:
                 if item not in input_data:
@@ -181,7 +181,6 @@ class Graph:
         return required_user_input
 
     def _execute(self, input_data: Optional[dict] = None) -> dict:
-
         t_graph_start = time.time()
         if self._parallel:
             outputs = self._run_nodes_parallel(input_data)
@@ -190,11 +189,9 @@ class Graph:
         logger.debug("All nodes executed successfully")
         t_graph_end = time.time()
         logger.debug(f"Graph execution took {1000 * (t_graph_end - t_graph_start): 0.2f} ms")
-
         return self._create_output(outputs)
 
     def _run_nodes_sequentially(self, input_data):
-
         nodes_to_execute = [i for i in range(len(self._nodes))]
 
         # Container where all the node inputs will be stored
@@ -210,13 +207,13 @@ class Graph:
             for node_index in nodes_to_execute:
                 node = self._nodes[node_index]
                 logger.debug(f"Executing node {node}")
-                node_input_data = self._get_node_input_data(node, inputs)
+                node_input_data = self._collect_node_input_data(node, inputs)
                 if len(node_input_data) < len(node.inputs):
                     logger.debug(f"Cannot find all the inputs for the node {node}.")
                     continue  # All the input data cannot be found for this node yet, so skip this node
                 logger.debug(f"Found all the inputs for the node {node}.")
                 if self._run_nodes:
-                    results = self._get_node_results(node, node_input_data)
+                    results = self._run_node_and_cache(node, node_input_data)
                     if results is not None:
                         inputs.update(results)
                 else:
@@ -247,18 +244,22 @@ class Graph:
             node = self._nodes[node_index]
             logger.debug(f"Launched task for node {node}, process id {multiprocessing.current_process().pid}")
             try:
+                # Wait until input data is available
+                counter = 0
                 while True:
                     logger.debug(f"Trying to execute node {node}")
-                    node_input_data = self._get_node_input_data(node, inputs)
+                    node_input_data = self._collect_node_input_data(node, inputs)
                     if len(node_input_data) < len(node.inputs):
-                        logger.debug(f"Cannot find all the inputs for the node {node}.")
+                        if counter % 100 == 0:
+                            logger.debug(f"Cannot find all the inputs for the node {node}.")
                         time.sleep(0.0001)
-                        continue  # All the input data cannot be found for this node yet, so skip this node
+                        counter += 1
+                        continue
                     else:
                         break
 
                 logger.debug(f"Found all the inputs for the node {node}.")
-                results = self._get_node_results(node, node_input_data)
+                results = self._run_node_and_cache(node, node_input_data)
                 if results is not None:
                     with lock:
                         inputs.update(results)
@@ -299,8 +300,9 @@ class Graph:
                 results[output] = inputs[output]
         return results
 
-    def _get_node_results(self, node: Node,
-                          node_input_data: list) -> Optional[dict]:
+    def _run_node_and_cache(self,
+                            node: Node,
+                            node_input_data: list) -> Optional[dict]:
         path = join(self._cache_dir, node.name)
         if node.name in self._from_cache:
             results = load_pickle(path)
@@ -316,13 +318,13 @@ class Graph:
         return results
 
     @staticmethod
-    def _check_node_names_are_unique(nodes: List[Node]) -> None:
+    def _validate_node_names(nodes: List[Node]) -> None:
         node_names = [n.name for n in nodes]
         if len(set(node_names)) < len(node_names):
             raise InvalidGraphError("All the nodes need to have unique name!")
 
     @staticmethod
-    def _get_node_input_data(node: Node, inputs: dict) -> list:
+    def _collect_node_input_data(node: Node, inputs: dict) -> list:
         input_data = []
         for i in node.inputs:
             if i in inputs:
