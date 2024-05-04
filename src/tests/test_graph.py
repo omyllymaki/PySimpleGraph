@@ -1,4 +1,5 @@
 import logging
+import os
 import shutil
 import unittest
 from functools import partial
@@ -8,7 +9,7 @@ from tinydag.exceptions import InvalidGraphError, MissingInputError, InvalidNode
 from tinydag.graph import Graph
 from tinydag.node import Node
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 
 
 def add(a, b):
@@ -35,21 +36,32 @@ def add_subtract(a, b):
     return {"add_output": a + b, "subtract_output": a - b}
 
 
-class TestRaisesException(unittest.TestCase):
+class BaseTest(unittest.TestCase):
+
+    def setUp(self):
+        self.run_parallel = self._get_parallel_arg()
+
+    @staticmethod
+    def _get_parallel_arg():
+        parallel_str = os.getenv('PARALLEL', 'False')
+        return parallel_str.lower() == 'true'
+
+
+class TestRaisesException(BaseTest):
 
     def test_node_missing_input(self):
         nodes = [
             Node(["x", "y"], add, "add", ["output"])
         ]
         g = Graph(nodes)
-        self.assertRaises(MissingInputError, g.calculate, {"x": 1, "z": 2})
+        self.assertRaises(MissingInputError, g.calculate, {"x": 1, "z": 2}, parallel=self.run_parallel)
 
     def test_node_missing_input2(self):
         nodes = [
             Node(["x", "y"], add, "add", ["output"])
         ]
         g = Graph(nodes)
-        self.assertRaises(MissingInputError, g.calculate, {"x": 1})
+        self.assertRaises(MissingInputError, g.calculate, {"x": 1}, parallel=self.run_parallel)
 
     def test_node_missing_input3(self):
         nodes = [
@@ -57,7 +69,7 @@ class TestRaisesException(unittest.TestCase):
             Node(["x", "z"], add, "add2", ["output"])
         ]
         g = Graph(nodes)
-        self.assertRaises(MissingInputError, g.calculate, {"x": 1, "y": 2})
+        self.assertRaises(MissingInputError, g.calculate, {"x": 1, "y": 2}, parallel=self.run_parallel)
 
     def test_missing_input4(self):
         nodes = [
@@ -65,7 +77,7 @@ class TestRaisesException(unittest.TestCase):
             Node(["add/output", "x"], mul, "mul", ["output"]),
         ]
         g = Graph(nodes)
-        self.assertRaises(MissingInputError, g.calculate, {"x": 1, "y": 2})
+        self.assertRaises(MissingInputError, g.calculate, {"x": 1, "y": 2}, parallel=self.run_parallel)
 
     def test_not_unique_node_names(self):
         nodes = [
@@ -82,7 +94,7 @@ class TestRaisesException(unittest.TestCase):
             Node(["add3/output", "add2/output"], mul, "add4", ["output"]),
         ]
         g = Graph(nodes)
-        self.assertRaises(InvalidGraphError, g.calculate, {"x": 1, "y": 2, "z": 3})
+        self.assertRaises(InvalidGraphError, g.calculate, {"x": 1, "y": 2, "z": 3}, parallel=self.run_parallel)
         self.assertRaises(InvalidGraphError, g.check)
 
     def test_function_doesnt_return_dict(self):
@@ -90,14 +102,14 @@ class TestRaisesException(unittest.TestCase):
             Node(["x", "y"], invalid_add_func, "add", ["output"])
         ]
         g = Graph(nodes)
-        self.assertRaises(InvalidNodeFunctionOutput, g.calculate, {"x": 1, "y": 2})
+        self.assertRaises(InvalidNodeFunctionOutput, g.calculate, {"x": 1, "y": 2}, parallel=self.run_parallel)
 
     def test_function_doesnt_return_all_the_required_outputs(self):
         nodes = [
             Node(["x", "y"], add, "add", ["output", "output2"])
         ]
         g = Graph(nodes)
-        self.assertRaises(InvalidNodeFunctionOutput, g.calculate, {"x": 1, "y": 2})
+        self.assertRaises(InvalidNodeFunctionOutput, g.calculate, {"x": 1, "y": 2}, parallel=self.run_parallel)
 
     def test_reading_from_non_existing_cache(self):
         nodes = [
@@ -112,10 +124,10 @@ class TestRaisesException(unittest.TestCase):
         data = {"x": 1, "y": 2, "z": 2}
 
         all_nodes = [n.name for n in nodes]
-        self.assertRaises(FileNotFoundError, g.calculate, data, from_cache=all_nodes)
+        self.assertRaises(FileNotFoundError, g.calculate, data, from_cache=all_nodes, parallel=self.run_parallel)
 
 
-class TestOperations(unittest.TestCase):
+class TestOperations(BaseTest):
 
     def test_add_and_mul(self):
         nodes = [
@@ -124,7 +136,7 @@ class TestOperations(unittest.TestCase):
         ]
         g = Graph(nodes)
         data = {"x": 1, "y": 2, "z": 2}
-        results = g.calculate(data)
+        results = g.calculate(data, parallel=self.run_parallel)
 
         self.assertEqual(len(results), len(nodes))
         self.assertEqual(results["add/output"], 1 + 2)
@@ -137,7 +149,7 @@ class TestOperations(unittest.TestCase):
         ]
         g = Graph(nodes)
         data = {"x": 1, "y": 2, "z": 2}
-        results = g.calculate(data)
+        results = g.calculate(data, parallel=self.run_parallel)
 
         self.assertEqual(len(results), len(nodes))
         self.assertEqual(results["add/output"], 1 + 2)
@@ -150,7 +162,7 @@ class TestOperations(unittest.TestCase):
         ]
         g = Graph(nodes)
         data = {"x": 1, "y": 2, "z": 2, "w": 6}
-        results = g.calculate(data)
+        results = g.calculate(data, parallel=self.run_parallel)
 
         self.assertEqual(len(results), len(nodes))
         self.assertEqual(results["add/output"], 1 + 2)
@@ -164,7 +176,7 @@ class TestOperations(unittest.TestCase):
         ]
         g = Graph(nodes)
         data = {"x": 1}
-        results = g.calculate(data)
+        results = g.calculate(data, parallel=self.run_parallel)
 
         self.assertEqual(len(results), len(nodes))
         self.assertEqual(results["5/output"], 5)
@@ -178,7 +190,7 @@ class TestOperations(unittest.TestCase):
             Node(["5/output"], add_2, "add_2", ["output"]),
         ]
         g = Graph(nodes)
-        results = g.calculate()
+        results = g.calculate(parallel=self.run_parallel)
 
         self.assertEqual(len(results), len(nodes))
         self.assertEqual(results["5/output"], 5)
@@ -194,7 +206,7 @@ class TestOperations(unittest.TestCase):
         ]
         g = Graph(nodes)
         data = {"x": 1, "y": 2, "z": 2}
-        results = g.calculate(data)
+        results = g.calculate(data, parallel=self.run_parallel)
 
         add_expected = 1 + 2
         mul_expected = add_expected * 2
@@ -216,8 +228,7 @@ class TestOperations(unittest.TestCase):
         ]
         g = Graph(nodes)
         data = {"x": 1, "y": 2, "z": 2}
-        results = g.calculate(data)
-        print(results)
+        results = g.calculate(data, parallel=self.run_parallel)
         self.assertEqual(len(results), 0)
 
     def test_multiple_non_connected_graphs(self):
@@ -229,8 +240,7 @@ class TestOperations(unittest.TestCase):
         graph = Graph(nodes)
 
         data = {"x1": 5, "x2": 3, "x3": 3, "x4": 2}
-        results = graph.calculate(data)
-        print(f"Result: {results}")
+        results = graph.calculate(data, parallel=self.run_parallel)
 
         self.assertEqual(len(results), len(nodes))
         self.assertEqual(results["add1/output"], 5 + 3)
@@ -247,7 +257,7 @@ class TestOperations(unittest.TestCase):
         g += new_node
 
         data = {"x": 1, "y": 2, "z": 2}
-        results = g.calculate(data)
+        results = g.calculate(data, parallel=self.run_parallel)
 
         self.assertEqual(len(results), 2)
         self.assertEqual(results["add/output"], 1 + 2)
@@ -266,7 +276,7 @@ class TestOperations(unittest.TestCase):
         g += new_nodes
 
         data = {"x": 1, "y": 2, "z": 2}
-        results = g.calculate(data)
+        results = g.calculate(data, parallel=self.run_parallel)
 
         self.assertEqual(len(results), 3)
         self.assertEqual(results["add1/output"], 1 + 2)
@@ -280,7 +290,7 @@ class TestOperations(unittest.TestCase):
         ]
         g = Graph(nodes)
         data = {"x": 1, "y": 2, "z": 2}
-        results = g.calculate(data)
+        results = g.calculate(data, parallel=self.run_parallel)
 
         self.assertEqual(len(results), 3)
         self.assertEqual(results["add_subtract/add_output"], 1 + 2)
@@ -301,15 +311,15 @@ class TestOperations(unittest.TestCase):
         all_nodes = [n.name for n in nodes]
 
         # First let's verify that we cannot read data from cache
-        self.assertRaises(FileNotFoundError, g.calculate, data, from_cache=all_nodes)
+        self.assertRaises(FileNotFoundError, g.calculate, data, from_cache=all_nodes, parallel=self.run_parallel)
 
         # Then, write to cache output of all nodes
-        results_ref = g.calculate(data, to_cache=all_nodes)
+        results_ref = g.calculate(data, to_cache=all_nodes, parallel=self.run_parallel)
 
         # Check that we get the same results when reading different data from cache
-        results1 = g.calculate(data, from_cache=all_nodes)
-        results2 = g.calculate(data, from_cache=["add"])
-        results3 = g.calculate(data, from_cache=["mul"])
+        results1 = g.calculate(data, from_cache=all_nodes, parallel=self.run_parallel)
+        results2 = g.calculate(data, from_cache=["add"], parallel=self.run_parallel)
+        results3 = g.calculate(data, from_cache=["mul"], parallel=self.run_parallel)
         self.assertEqual(results1, results_ref)
         self.assertEqual(results2, results_ref)
         self.assertEqual(results3, results_ref)
@@ -318,11 +328,11 @@ class TestOperations(unittest.TestCase):
         data = {"x": 2, "y": 3, "z": 3}
 
         # When reading from cache, we should get the same results
-        results4 = g.calculate(data, from_cache=all_nodes)
+        results4 = g.calculate(data, from_cache=all_nodes, parallel=self.run_parallel)
         self.assertEqual(results4, results_ref)
 
         # Without cache, we should get different results
-        results5 = g.calculate(data)
+        results5 = g.calculate(data, parallel=self.run_parallel)
         self.assertNotEquals(results5, results_ref)
 
 
