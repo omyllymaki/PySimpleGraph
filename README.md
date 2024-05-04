@@ -4,7 +4,7 @@ A small library to orchestrate function calls using graph structure.
 
 The library contains bare-bones implementation of computation (directed, acyclic) graph. User provides a graph structure
 (nodes) and input data for the graph. The graph executes every node in the graph and returns output of every node as the 
-result. The library supports multiple outputs per node and caching of the node results.
+result. The library supports multiple outputs per node, caching of the node results, and parallel execution of the nodes.
 
 # Requirements
 
@@ -25,10 +25,12 @@ pip3 install tiny-dag
 
 # Usage
 
-The usage should be quite intuitive: write your functions as you normally would and then create graph structure that
-orchestrates the functions calls. There is one extra rule you need to know, though: functions need to return dict with
-keys matching output definition of the node. Output of the node can be referenced in the graph structure by 
-node_name/output_name.
+Here are the rules:
+- Node functions need to return dict (or None) with keys matching node output definition.
+- Output of the node is referenced in the graph structure by node_name/output_name.
+- User needs to provide missing information, as dict, when calculate method is called.  
+
+And thats it. Otherwise you are free to write any kind of functions and orchestrate calling of those functions by defining nodes that form the graph.
 
 Usage example:
 ```
@@ -52,7 +54,6 @@ graph = Graph(nodes)
 graph.render()
 
 data = {"x": 5, "y": 3, "z": 3}
-graph.check()
 results = graph.calculate(data)
 print(f"Result: {results}")
 ```

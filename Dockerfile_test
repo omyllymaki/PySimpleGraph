@@ -7,4 +7,4 @@ WORKDIR /app
 COPY src/tinydag /app/tinydag
 COPY src/tests/test_graph.py /app
 
-CMD ["python", "test_graph.py"]
+CMD ["sh", "-c", "PARALLEL=True python test_graph.py && PARALLEL=False python test_graph.py"]

@@ -36,7 +36,7 @@ def main():
     graph.render()
 
     data = {"x": 5, "y": 3, "z": 3}
-    graph.check()
+    graph.validate_graph()
     results = graph.calculate(data)
     print(f"Result: {results}")
 
