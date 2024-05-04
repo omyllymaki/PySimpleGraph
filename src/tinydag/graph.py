@@ -182,6 +182,7 @@ class Graph:
 
     def _execute(self, input_data: Optional[dict] = None) -> dict:
         t_graph_start = time.time()
+        # TODO: refactor methods for parallel and sequential processing, now they contain plenty of duplicate logic and code
         if self._parallel:
             outputs = self._run_nodes_parallel(input_data)
         else:
