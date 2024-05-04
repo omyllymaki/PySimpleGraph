@@ -28,6 +28,11 @@ def get_number(a):
     return {"output": a}
 
 
+def add_return_none(a, b):
+    c = a + b
+    return
+
+
 def invalid_add_func(a, b):
     return a + b  # Should return dict
 
@@ -225,6 +230,16 @@ class TestOperations(BaseTest):
         nodes = [
             Node(["x", "y"], add, "add"),
             Node(["y", "z"], mul, "mul"),
+        ]
+        g = Graph(nodes)
+        data = {"x": 1, "y": 2, "z": 2}
+        results = g.calculate(data, parallel=self.run_parallel)
+        self.assertEqual(len(results), 0)
+
+    def test_no_output2(self):
+        nodes = [
+            Node(["x", "y"], add_return_none, "add1"),
+            Node(["y", "z"], add_return_none, "add2"),
         ]
         g = Graph(nodes)
         data = {"x": 1, "y": 2, "z": 2}
