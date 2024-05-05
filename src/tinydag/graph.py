@@ -195,7 +195,7 @@ class Graph:
         logger.debug(f"Graph execution took {1000 * (t_graph_end - t_graph_start): 0.2f} ms")
         return self._create_output(outputs)
 
-    def _run_nodes_sequentially(self, input_data):
+    def _run_nodes_sequentially(self, input_data: Optional[dict]) -> dict:
         nodes_to_execute = [i for i in range(len(self._nodes))]
 
         # Container where all the node inputs will be stored
@@ -236,7 +236,7 @@ class Graph:
 
         return inputs
 
-    def _run_nodes_parallel(self, input_data: dict) -> dict:
+    def _run_nodes_parallel(self, input_data: Optional[dict]) -> dict:
         manager = multiprocessing.Manager()
         inputs = manager.dict(input_data) if input_data is not None else manager.dict()
         exception_queue = multiprocessing.Queue()
