@@ -235,58 +235,73 @@ class Graph:
 
         return inputs
 
-    def _run_nodes_parallel(self, input_data):
+    def _run_nodes_parallel(self, input_data: dict) -> dict:
+        nodes_to_execute = [i for i in range(len(self._nodes))]
         manager = multiprocessing.Manager()
-        exception_flag = manager.Value('i', 0)
         inputs = manager.dict(input_data) if input_data is not None else manager.dict()
         exception_queue = multiprocessing.Queue()
+        results_queue = multiprocessing.Queue()
         lock = multiprocessing.Lock()
 
         def node_task(node_index):
             node = self._nodes[node_index]
             logger.info(f"Launched task for node {node}, process id {multiprocessing.current_process().pid}")
             try:
-                # Wait until input data is available
-                logger.debug(f"Node {node} waiting for the data")
-                while True:
-                    if exception_flag.value:
-                        logger.warning(f"Terminating node {node} early due to exception in another process")
-                        return
-                    node_input_data = self._collect_node_input_data(node, inputs)
-                    if len(node_input_data) < len(node.inputs):
-                        time.sleep(0.0001)
-                        continue
-                    else:
-                        break
-
-                logger.debug(f"Found all the inputs for the node {node}.")
                 results = self._run_node_and_cache(node, node_input_data)
+                logger.info(f"Node {node} executed successfully")
                 if results is not None:
                     with lock:
                         inputs.update(results)
-
-                logger.info(f"Node {node} executed successfully")
-                logger.debug(f"Add node {node} output to inputs, inputs now contains {inputs.keys()}")
-                return node_index
+                results_queue.put(node_index)
+                return
             except Exception as e:
                 logger.warning(f"Node {node} raised exception {e}")
-                exception_flag.value = 1
                 exception_queue.put(e)
+                results_queue.put(None)
                 return
 
-        processes = []
-        for node_index in range(len(self._nodes)):
-            process = multiprocessing.Process(target=node_task, args=(node_index,))
-            process.start()
-            processes.append(process)
+        # Loop until all the nodes are executed
+        nodes_in_processing, processes_running = [], []
+        while len(nodes_to_execute) > 0:
+            logger.debug(f"Nodes to execute: {nodes_to_execute}")
 
-        for process in processes:
-            process.join()
+            # Start process for every node that has all the inputs available
+            for node_index in set(nodes_to_execute) - set(nodes_in_processing):
+                node = self._nodes[node_index]
+                logger.debug(f"Checking input for node {node}")
+                node_input_data = self._collect_node_input_data(node, inputs)
+                if len(node_input_data) < len(node.inputs):
+                    logger.debug(f"Cannot find all the inputs for the node {node}.")
+                    continue  # All the input data cannot be found for this node yet, so skip this node
+                logger.debug(f"Found all the inputs for the node {node}.")
 
-        while not exception_queue.empty():
-            exception = exception_queue.get()
-            logger.warning(f"Received exception {exception}")
-            raise exception
+                process = multiprocessing.Process(target=node_task, args=(node_index,))
+                process.start()
+                processes_running.append(process)
+                nodes_in_processing.append(node_index)
+
+            # Check if any of the processes has finished
+            for process in processes_running:
+                if not process.is_alive():
+
+                    logger.debug(f"Process {process.pid} has finished")
+
+                    while not exception_queue.empty():
+                        exception = exception_queue.get()
+                        logger.warning(f"Received exception {exception}")
+                        raise exception
+
+                    while not results_queue.empty():
+                        node_index = results_queue.get()
+                        nodes_to_execute.remove(node_index)
+                        nodes_in_processing.remove(node_index)
+                        logger.info(
+                            f"Number of nodes: \n " +
+                            f"in processing: {len(nodes_in_processing)} \n " +
+                            f"unfinished: {len(nodes_to_execute)} \n " +
+                            f"finished: {len(self._nodes) - len(nodes_to_execute)}")
+
+                    break
 
         return inputs
 
