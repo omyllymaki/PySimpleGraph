@@ -280,28 +280,30 @@ class Graph:
                 processes_running.append(process)
                 nodes_in_processing.append(node_index)
 
-            # Check if any of the processes has finished
-            for process in processes_running:
-                if not process.is_alive():
+            # Wait until at least one of the running processes has finished
+            process_finished_flag = False
+            while not process_finished_flag:
+                for process in processes_running:
+                    if not process.is_alive():
 
-                    logger.debug(f"Process {process.pid} has finished")
+                        logger.debug(f"Process {process.pid} has finished")
 
-                    while not exception_queue.empty():
-                        exception = exception_queue.get()
-                        logger.warning(f"Received exception {exception}")
-                        raise exception
+                        while not exception_queue.empty():
+                            exception = exception_queue.get()
+                            logger.warning(f"Received exception {exception}")
+                            raise exception
 
-                    while not results_queue.empty():
-                        node_index = results_queue.get()
-                        nodes_to_execute.remove(node_index)
-                        nodes_in_processing.remove(node_index)
-                        logger.info(
-                            f"Number of nodes: \n " +
-                            f"in processing: {len(nodes_in_processing)} \n " +
-                            f"unfinished: {len(nodes_to_execute)} \n " +
-                            f"finished: {len(self._nodes) - len(nodes_to_execute)}")
+                        while not results_queue.empty():
+                            node_index = results_queue.get()
+                            nodes_to_execute.remove(node_index)
+                            nodes_in_processing.remove(node_index)
+                            logger.info(
+                                f"Number of nodes: \n " +
+                                f"in processing: {len(nodes_in_processing)} \n " +
+                                f"unfinished: {len(nodes_to_execute)} \n " +
+                                f"finished: {len(self._nodes) - len(nodes_to_execute)}")
 
-                    break
+                        process_finished_flag = True
 
         return inputs
 
