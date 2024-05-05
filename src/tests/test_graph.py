@@ -467,7 +467,8 @@ class TestOperations(BaseTest):
 
         g = Graph(nodes)
         data = {"x": 1, "y": 2, "z": 2}
-        g.calculate(data)
+        results = g.calculate(data, parallel=self.run_parallel)
+        self.assertEqual(len(results), len(nodes))
 
 
 class TestRendering(unittest.TestCase):
