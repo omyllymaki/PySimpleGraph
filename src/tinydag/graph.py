@@ -3,6 +3,7 @@ import os
 from typing import List, Union, Optional
 
 from tinydag.exceptions import InvalidGraphError, MissingInputError
+from tinydag.internal.rendering import render_with_outputs, render_without_outputs
 from tinydag.node import Node
 from tinydag.internal.node_runner import NodeRunner
 
@@ -70,29 +71,19 @@ class Graph:
 
     def render(self,
                path: str = "graph.gv",
-               view: bool = True) -> Optional["Digraph"]:
+               view: bool = True,
+               show_outputs=True) -> None:
         """
         Render graph. This will only work if graphviz is available.
         :param path: Path to save fig.
         :param view: Show graph fig.
-        :return: graphviz Digraph is graphviz is available, otherwise None.
+        :param show_outputs: Show outputs of the graph.
         """
-
         try:
-            dot = graphviz.Digraph()
-            for node in self._nodes:
-                dot.node(node.name, node.name, shape='box', style='filled', fillcolor='lightblue')
-                for output in node.outputs:
-                    dot.node(output, output, shape='oval', style='filled', fillcolor='lightgreen')
-                    dot.edge(node.name, output)
-                for node_input in node.inputs:
-                    if node_input in self._required_user_inputs:
-                        dot.node(node_input, node_input, shape='ellipse', style='filled', fillcolor='lightpink')
-                    else:
-                        dot.node(node_input, node_input, shape='oval', style='filled', fillcolor='lightgreen')
-                    dot.edge(node_input, node.name)
-            dot.render(path, view=view)
-            return dot
+            if show_outputs:
+                render_with_outputs(self._nodes, self._required_user_inputs, path, view)
+            else:
+                render_without_outputs(self._nodes, self._required_user_inputs, path, view)
         except Exception as e:
             logger.warning(f"Graph cannot be rendered, caught error: {e}")
             return None

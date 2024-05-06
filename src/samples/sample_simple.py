@@ -33,7 +33,7 @@ def main():
 
     graph = Graph(nodes)
     print("Graph: ", graph)
-    graph.render()
+    graph.render(show_outputs=True)
 
     data = {"x": 5, "y": 3, "z": 3}
     results = graph.calculate(data, parallel=False)
