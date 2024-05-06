@@ -3,7 +3,7 @@ import os
 from typing import List, Union, Optional
 
 from tinydag.exceptions import InvalidGraphError, MissingInputError
-from tinydag.internal.rendering import render_with_outputs, render_without_outputs
+from tinydag.internal.rendering import render
 from tinydag.node import Node
 from tinydag.internal.node_runner import NodeRunner
 
@@ -80,10 +80,7 @@ class Graph:
         :param show_outputs: Show outputs of the graph.
         """
         try:
-            if show_outputs:
-                render_with_outputs(self._nodes, self._required_user_inputs, path, view)
-            else:
-                render_without_outputs(self._nodes, self._required_user_inputs, path, view)
+            render(self._nodes, self._required_user_inputs, path, view, show_outputs)
         except Exception as e:
             logger.warning(f"Graph cannot be rendered, caught error: {e}")
             return None

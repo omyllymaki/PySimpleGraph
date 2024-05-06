@@ -9,10 +9,21 @@ except ImportError:
     logger.warning("Cannot import graphviz")
 
 
-def render_without_outputs(nodes: List["Node"],
-                           inputs: List[str],
-                           path: str = "graph.gv",
-                           view: bool = True) -> None:
+def render(nodes: List["Node"],
+           inputs: List[str],
+           path: str = "graph.gv",
+           view: bool = True,
+           show_outputs: bool = True):
+    if show_outputs:
+        _render_with_outputs(nodes, inputs, path, view)
+    else:
+        _render_without_outputs(nodes, inputs, path, view)
+
+
+def _render_without_outputs(nodes: List["Node"],
+                            inputs: List[str],
+                            path: str = "graph.gv",
+                            view: bool = True) -> None:
     dot = graphviz.Digraph()
     for node in nodes:
         dot.node(node.name, node.name, shape='box', style='filled', fillcolor='lightblue')
@@ -30,10 +41,10 @@ def render_without_outputs(nodes: List["Node"],
     dot.render(path, view=view)
 
 
-def render_with_outputs(nodes: List["Node"],
-                        inputs: List[str],
-                        path: str = "graph.gv",
-                        view: bool = True) -> None:
+def _render_with_outputs(nodes: List["Node"],
+                         inputs: List[str],
+                         path: str = "graph.gv",
+                         view: bool = True) -> None:
     dot = graphviz.Digraph()
     for node in nodes:
         dot.node(node.name, node.name, shape='box', style='filled', fillcolor='lightblue')
