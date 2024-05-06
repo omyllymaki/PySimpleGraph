@@ -4,7 +4,7 @@ from typing import List, Union, Optional
 
 from tinydag.exceptions import InvalidGraphError, MissingInputError
 from tinydag.node import Node
-from tinydag.node_runner import _NodeRunner
+from tinydag.internal.node_runner import NodeRunner
 
 logger = logging.getLogger(__name__)
 
@@ -66,7 +66,7 @@ class Graph:
         self._validate_node_names(nodes)
         self._nodes = nodes
         self._required_user_inputs = self._get_required_user_inputs()
-        self._node_runner = _NodeRunner(nodes, cache_dir)
+        self._node_runner = NodeRunner(nodes, cache_dir)
 
     def render(self,
                path: str = "graph.gv",

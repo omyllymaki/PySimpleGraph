@@ -8,12 +8,12 @@ from typing import List, Optional, Dict, Tuple
 
 from tinydag.exceptions import InvalidGraphError
 from tinydag.node import Node
-from tinydag.utils import load_pickle, save_pickle
+from tinydag.internal.utils import load_pickle, save_pickle
 
 logger = logging.getLogger(__name__)
 
 
-class _NodeRunner:
+class NodeRunner:
     """
     Internal class to run nodes.
     """
