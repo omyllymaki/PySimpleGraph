@@ -5,7 +5,7 @@ import time
 from copy import deepcopy
 from multiprocessing import Queue, Process
 from os.path import join
-from typing import List, Union, Optional, Dict
+from typing import List, Union, Optional, Dict, Tuple
 
 from tinydag.exceptions import InvalidGraphError, MissingInputError
 from tinydag.node import Node
@@ -207,20 +207,7 @@ class Graph:
         while len(nodes_to_execute) > 0:
 
             # Execute every node that has all the inputs available
-            nodes_executed = []
-            for node_index in nodes_to_execute:
-                node = self._nodes[node_index]
-                node_input_data = self._collect_node_input_data(node, inputs)
-                if len(node_input_data) < len(node.inputs):
-                    continue
-                if self._run_nodes:
-                    results = self._run_node_and_cache(node, node_input_data)
-                    if results is not None:
-                        inputs.update(results)
-                else:
-                    for output in node.outputs:
-                        inputs[output] = None
-                nodes_executed.append(node_index)
+            nodes_executed, inputs = self._execute_nodes_with_inputs_available(inputs, nodes_to_execute)
 
             # Check that at least one of the nodes has been executed during this round
             # If not, it means that the graph has invalid structure
@@ -236,6 +223,25 @@ class Graph:
                 f"finished: {len(self._nodes) - len(nodes_to_execute)}")
 
         return inputs
+
+    def _execute_nodes_with_inputs_available(self,
+                                             inputs: dict,
+                                             nodes_to_execute: List[int]) -> Tuple[List[int], dict]:
+        nodes_executed = []
+        for node_index in nodes_to_execute:
+            node = self._nodes[node_index]
+            node_input_data = self._collect_node_input_data(node, inputs)
+            if len(node_input_data) < len(node.inputs):
+                continue
+            if self._run_nodes:
+                results = self._run_node_and_cache(node, node_input_data)
+                if results is not None:
+                    inputs.update(results)
+            else:
+                for output in node.outputs:
+                    inputs[output] = None
+            nodes_executed.append(node_index)
+        return nodes_executed, inputs
 
     def _run_nodes_parallel(self, input_data: Optional[dict]) -> dict:
         # Init variables shared between the processes
