@@ -72,7 +72,7 @@ class Graph:
     def render(self,
                path: str = "graph.gv",
                view: bool = True,
-               show_outputs=True) -> None:
+               show_outputs: bool = True) -> None:
         """
         Render graph. This will only work if graphviz is available.
         :param path: Path to save fig.
