@@ -3,17 +3,11 @@ import os
 from typing import List, Union, Optional
 
 from tinydag.exceptions import InvalidGraphError, MissingInputError
+from tinydag.internal.node_runner import NodeRunner
 from tinydag.internal.rendering import render
 from tinydag.node import Node
-from tinydag.internal.node_runner import NodeRunner
 
 logger = logging.getLogger(__name__)
-
-try:
-    import graphviz as graphviz
-    from graphviz import Digraph
-except ImportError:
-    logger.warning("Cannot import graphviz")
 
 
 class Graph:

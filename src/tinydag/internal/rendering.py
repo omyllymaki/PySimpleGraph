@@ -1,6 +1,8 @@
 import logging
 from typing import List
 
+from tinydag.node import Node
+
 logger = logging.getLogger(__name__)
 
 try:
@@ -9,7 +11,7 @@ except ImportError:
     logger.warning("Cannot import graphviz")
 
 
-def render(nodes: List["Node"],
+def render(nodes: List[Node],
            inputs: List[str],
            path: str = "graph.gv",
            view: bool = True,
@@ -20,7 +22,7 @@ def render(nodes: List["Node"],
         _render_without_outputs(nodes, inputs, path, view)
 
 
-def _render_without_outputs(nodes: List["Node"],
+def _render_without_outputs(nodes: List[Node],
                             inputs: List[str],
                             path: str = "graph.gv",
                             view: bool = True) -> None:
