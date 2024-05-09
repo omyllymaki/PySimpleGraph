@@ -1,6 +1,6 @@
 # Tiny DAG
 
-A small library to orchestrate function calls using graph structure.
+A small library to orchestrate and visualize function calls using graph structure.
 
 The library contains bare-bones implementation of computation (directed, acyclic) graph. User provides a graph structure
 (nodes) and input data for the graph. The graph executes every node in the graph and returns output of every node as the 
@@ -8,12 +8,14 @@ result. The library supports multiple outputs per node, caching of the node resu
 
 # Requirements
 
+This is plain Python, no external hard requirements.
+
 - Python >= 3.6
-- graphviz (optional)
+- graphviz (optional, needed for rendering graphs)
 
 # Installation
 
-Install graphviz (optional, needed for rendering)
+Install graphviz (optional)
 ```
 sudo apt-get install graphviz
 ```
@@ -30,7 +32,8 @@ Here are the rules:
 - Output of the node is referenced in the graph structure by node_name/output_name.
 - User needs to provide missing information, as dict, when calculate method is called.  
 
-And thats it. Otherwise you are free to write any kind of functions and orchestrate calling of those functions by defining nodes that form the graph.
+And that's it. Otherwise, you are free to write any kind of functions and orchestrate calling of those functions by 
+defining nodes that form the graph.
 
 Usage example:
 ```

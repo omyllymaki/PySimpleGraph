@@ -100,7 +100,7 @@ class Graph:
         :param input_data: Input data for the graph, where keys are names used in the graph definition.
         :param from_cache: List of node names to read from cache.
         :param to_cache: List of node names to save to cache.
-        :param parallel: Run nodes in parallel, one process for each.
+        :param parallel: Run nodes in parallel, one process for each. Internally uses python multiprocessing module.
         :param copy_node_input_data: Make deepcopy of the data that is passed to node.
         :return: Output of every node, with node outputs as keys.
         :raises MissingInputError if the input_data doesn't contain all the required data.

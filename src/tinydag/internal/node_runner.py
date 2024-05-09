@@ -100,6 +100,7 @@ class NodeRunner:
 
     def _run_nodes_parallel(self, input_data: Optional[dict]) -> dict:
         # Init variables shared between the processes
+        # Initially tried queues to exchange data between processes but that didn't handle large data well, so now using shared data
         manager = multiprocessing.Manager()
         inputs = manager.dict(input_data) \
             if input_data is not None \
