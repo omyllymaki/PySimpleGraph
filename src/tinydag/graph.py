@@ -84,7 +84,7 @@ class Graph:
         Check if the graph structure is valid.
         :raises InvalidGraphError if the graph structure is not valid.
         """
-        logger.info(f"Graph validation started")
+        logger.info(f"Validate graph by making 'dry run'")
         input_data = {name: None for name in self._required_user_inputs}
         self._node_runner.run(input_data, parallel=False, dry_run=True)
         logger.info(f"Graph validation was successful")

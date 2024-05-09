@@ -27,7 +27,7 @@ class NodeRunner:
         self._to_cache = None
         self._parallel = False
         self._copy_node_input_data = True
-        self._dry_run = True
+        self._dry_run = False
 
     def run(self,
             input_data: Optional[dict] = None,
@@ -35,7 +35,7 @@ class NodeRunner:
             to_cache: Optional[List[str]] = None,
             parallel: bool = False,
             copy_node_input_data: bool = True,
-            dry_run: bool = True) -> dict:
+            dry_run: bool = False) -> dict:
         self._from_cache = from_cache if from_cache is not None else []
         self._to_cache = to_cache if to_cache is not None else []
         self._parallel = parallel
@@ -46,7 +46,6 @@ class NodeRunner:
 
     def _execute(self, input_data: Optional[dict] = None) -> dict:
         t_graph_start = time.time()
-        # TODO: refactor methods for parallel and sequential processing, now they contain plenty of duplicate logic and code
         if self._parallel:
             outputs = self._run_nodes_parallel(input_data)
         else:
@@ -93,13 +92,9 @@ class NodeRunner:
             node_input_data = self._collect_node_input_data(node, inputs)
             if len(node_input_data) < len(node.inputs):
                 continue
-            if self._dry_run:
-                for output in node.outputs:
-                    inputs[output] = None
-            else:
-                results = self._run_node_and_cache(node, node_input_data)
-                if results is not None:
-                    inputs.update(results)
+            results = self._run_node_and_cache(node, node_input_data)
+            if results is not None:
+                inputs.update(results)
             nodes_executed.append(node_index)
         return nodes_executed, inputs
 
@@ -118,7 +113,7 @@ class NodeRunner:
             # Start process for every node that has all the inputs available and is not already running
             running_processes = self._start_node_processes(inputs, nodes_to_execute, running_processes, exception_queue)
 
-            # Wait until at least one of the running processes has finished
+            # Wait until one of the running processes has finished
             node_index_finished = self._wait_process_to_finish(running_processes, exception_queue)
             nodes_to_execute.remove(node_index_finished)
             running_processes.pop(node_index_finished)
@@ -187,6 +182,8 @@ class NodeRunner:
     def _run_node_and_cache(self,
                             node: Node,
                             node_input_data: list) -> Optional[dict]:
+        if self._dry_run:
+            return {o: None for o in node.outputs}
         path = join(self._cache_dir, node.name)
         if node.name in self._from_cache:
             results = load_pickle(path)
@@ -211,6 +208,6 @@ class NodeRunner:
                 input_data.append(inputs[i])
             else:
                 logger.debug(f"Cannot find input {i} for node {node}.")
-                break  # We cannot execute node without full input, so no need to continue
+                return input_data  # We cannot execute node without full input, so no need to continue
         logger.debug(f"Found all the inputs for the node {node}.")
         return input_data
