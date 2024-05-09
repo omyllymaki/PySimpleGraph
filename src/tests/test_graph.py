@@ -45,6 +45,14 @@ def add_subtract(a, b):
     return {"add_output": a + b, "subtract_output": a - b}
 
 
+def add_lists(a, b):
+    return {"output": [i + j for i, j in zip(a, b)]}
+
+
+def mul_lists(a, b):
+    return {"output": [i * j for i, j in zip(a, b)]}
+
+
 class BaseTest(unittest.TestCase):
 
     def setUp(self):
@@ -360,6 +368,45 @@ class TestOperations(BaseTest):
         # Without cache, we should get different results
         results5 = g.calculate(data, parallel=self.run_parallel)
         self.assertNotEquals(results5, results_ref)
+
+    def test_lists(self):
+        nodes = [
+            Node(["x", "y"], add_lists, "add", ["output"]),
+            Node(["add/output", "z"], mul_lists, "mul", ["output"]),
+        ]
+        g = Graph(nodes)
+
+        size = 10
+        x = size*[0]
+        y = size*[1]
+        z = size*[2]
+        data = {"x": x, "y": y, "z": z}
+        results = g.calculate(data, parallel=self.run_parallel)
+
+        self.assertEqual(len(results), len(nodes))
+        self.assertEqual(results["add/output"], size*[1])
+        self.assertEqual(results["mul/output"], size*[2])
+
+    def test_large_lists(self):
+        # Noticed that multiprocessing can get stuck with large inputs if not done correctly.
+        # See e.g. https://stackoverflow.com/questions/59951832/python-multiprocessing-queue-makes-code-hang-with-large-data
+        # This test will check that this doesn't happen
+        nodes = [
+            Node(["x", "y"], add_lists, "add", ["output"]),
+            Node(["add/output", "z"], mul_lists, "mul", ["output"]),
+        ]
+        g = Graph(nodes)
+
+        size = 10**6
+        x = size*[0]
+        y = size*[1]
+        z = size*[2]
+        data = {"x": x, "y": y, "z": z}
+        results = g.calculate(data, parallel=self.run_parallel)
+
+        self.assertEqual(len(results), len(nodes))
+        self.assertEqual(results["add/output"], size*[1])
+        self.assertEqual(results["mul/output"], size*[2])
 
     def test_large_graph(self):
         nodes = [
